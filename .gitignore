@@ -1,0 +1,45 @@
+# Runtime secrets/local env
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+
+# Node / Next
+node_modules/
+.next/
+*.tsbuildinfo
+next-env.d.ts
+
+# Build / cache artifacts
+build/
+dist/
+coverage/
+.turbo/
+
+# Runtime state
+logs/
+*.log
+.local-dev.pids
+*.db
+*.sqlite
+*.sqlite3
+agentic_commerce.db
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+*.swo
+*~

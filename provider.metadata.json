@@ -1,0 +1,109 @@
+{
+  "schemaVersion": "1.0.0",
+  "provider": {
+    "id": "agentic-commerce-blueprint-provider",
+    "name": "Agentic Commerce Provider",
+    "version": "1.0.0",
+    "category": "commerce",
+    "description": "One-command Docker provider for Agentic Commerce (merchant API, PSP, Apps SDK MCP server, UI gateway, and NAT agents).",
+    "repository": "https://github.com/baolnq-ai/Agentic-Commerce-blueprint-provider-.git",
+    "maintainers": [
+      {
+        "name": "Provider Owner",
+        "contact": "hub-owner"
+      }
+    ],
+    "tags": [
+      "agentic-commerce",
+      "acp",
+      "ucp",
+      "apps-sdk",
+      "mcp",
+      "docker"
+    ]
+  },
+  "runtime": {
+    "type": "docker-compose",
+    "entrypoint": "bash runall.sh",
+    "stopCommand": "bash stop.sh",
+    "installCommand": "bash runall.sh",
+    "requiredFiles": [
+      "docker-compose.infra.yml",
+      "docker-compose.yml",
+      "nginx.conf",
+      "runall.sh",
+      "stop.sh",
+      "env.example",
+      "provider.metadata.json"
+    ],
+    "env": {
+      "required": [
+        "NVIDIA_API_KEY"
+      ],
+      "optional": [
+        "NIM_LLM_BASE_URL",
+        "NIM_LLM_MODEL_NAME",
+        "NIM_EMBED_BASE_URL",
+        "NIM_EMBED_MODEL_NAME",
+        "MERCHANT_API_KEY",
+        "PSP_API_KEY",
+        "WEBHOOK_SECRET"
+      ],
+      "templateFile": "env.example"
+    },
+    "dependencies": {
+      "dockerEngine": ">=24.0.0",
+      "dockerCompose": ">=2.0.0"
+    },
+    "ports": [
+      {
+        "name": "gateway",
+        "host": 80,
+        "protocol": "http",
+        "public": true,
+        "description": "Main UI and API gateway"
+      },
+      {
+        "name": "phoenix",
+        "host": 6006,
+        "protocol": "http",
+        "public": true,
+        "description": "Tracing dashboard"
+      },
+      {
+        "name": "minio-console",
+        "host": 9001,
+        "protocol": "http",
+        "public": true,
+        "description": "MinIO console"
+      }
+    ],
+    "healthChecks": [
+      {
+        "name": "merchant",
+        "type": "http",
+        "url": "http://localhost/api/health",
+        "expectedStatus": 200
+      },
+      {
+        "name": "psp",
+        "type": "http",
+        "url": "http://localhost/psp/health",
+        "expectedStatus": 200
+      },
+      {
+        "name": "apps-sdk",
+        "type": "http",
+        "url": "http://localhost/apps-sdk/health",
+        "expectedStatus": 200
+      }
+    ]
+  },
+  "hubIntegration": {
+    "installMode": "single-command",
+    "defaultCommand": "bash runall.sh",
+    "postInstallMessage": "Provider started. Open http://localhost",
+    "supportsUpgrade": true,
+    "supportsUninstall": true
+  }
+}
