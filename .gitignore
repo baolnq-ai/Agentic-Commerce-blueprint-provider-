@@ -27,6 +27,14 @@ dist/
 coverage/
 .turbo/
 
+# Keep prebuilt KUI package bundles required by Next.js build
+!src/ui/kui-foundations-react-external/dist/
+!src/ui/kui-foundations-react-external/dist/**
+!src/ui/kui-foundations-react-external/foundations-design-tokens/dist/
+!src/ui/kui-foundations-react-external/foundations-design-tokens/dist/**
+!src/ui/kui-foundations-react-external/nebula/dist/
+!src/ui/kui-foundations-react-external/nebula/dist/**
+
 # Runtime state
 logs/
 *.log
