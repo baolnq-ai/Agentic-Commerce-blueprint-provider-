@@ -247,17 +247,23 @@ def _parse_agent_response(raw_result: Any) -> dict[str, Any]:
         result_dict = cast(dict[str, Any], raw_result)
         value = result_dict.get("value")
         if isinstance(value, str):
-            loaded = json.loads(value)
-            if isinstance(loaded, dict):
-                parsed = cast(dict[str, Any], loaded)
+            try:
+                loaded = json.loads(value)
+                if isinstance(loaded, dict):
+                    parsed = cast(dict[str, Any], loaded)
+            except json.JSONDecodeError:
+                parsed = {}
         elif isinstance(value, dict):
             parsed = cast(dict[str, Any], value)
         elif "recommendations" in result_dict:
             parsed = result_dict
     elif isinstance(raw_result, str):
-        loaded = json.loads(raw_result)
-        if isinstance(loaded, dict):
-            parsed = cast(dict[str, Any], loaded)
+        try:
+            loaded = json.loads(raw_result)
+            if isinstance(loaded, dict):
+                parsed = cast(dict[str, Any], loaded)
+        except json.JSONDecodeError:
+            parsed = {}
 
     return parsed
 
@@ -278,6 +284,8 @@ async def call_recommendation_agent(
     ]
 
     for item in cart_items:
+        if item.product_id == product_id:
+            continue
         agent_cart_items.append(
             {
                 "product_id": item.product_id,
@@ -286,6 +294,8 @@ async def call_recommendation_agent(
                 "price": item.price,
             }
         )
+        if len(agent_cart_items) >= 2:
+            break
 
     payload = {
         "input_message": json.dumps(
