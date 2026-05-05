@@ -86,7 +86,18 @@ DEFAULT_EMBED_MODEL = "nvidia/nv-embedqa-e5-v5"
 # Falls back to legacy EMBED_API_URL for backward compatibility
 NIM_EMBED_BASE_URL = os.environ.get("NIM_EMBED_BASE_URL", DEFAULT_EMBED_BASE_URL)
 EMBEDDING_MODEL = os.environ.get("NIM_EMBED_MODEL_NAME", DEFAULT_EMBED_MODEL)
-EMBEDDING_DIM = 1024  # NV-EmbedQA-E5-v5 dimension
+
+
+def _default_embedding_dim(model_name: str) -> int:
+    model = (model_name or "").lower()
+    if "nomic-embed-text" in model:
+        return 768
+    if "nv-embedqa-e5-v5" in model:
+        return 1024
+    return 1024
+
+
+EMBEDDING_DIM = _default_embedding_dim(EMBEDDING_MODEL)
 
 # Build the full embedding API URL
 # If legacy EMBED_API_URL is set, use it directly for backward compatibility
@@ -185,17 +196,22 @@ def wait_for_embedding_service() -> bool:
         print(f"\nUsing NVIDIA API Catalog for embeddings")
         return True
     
-    # For local NIM, wait for health endpoint
+    # For local NIM, probe the embeddings endpoint directly.
+    # Local providers (for example Ollama) may not expose /health/ready.
     print(f"\nWaiting for embedding service at {EMBED_API_URL}...")
-    
-    # Extract base URL for health check
-    base_url = EMBED_API_URL.rsplit("/", 1)[0]  # Remove /embeddings
-    health_url = f"{base_url}/health/ready"
     
     for attempt in range(1, MAX_RETRIES + 1):
         try:
+            headers = {"Content-Type": "application/json"}
+            if NVIDIA_API_KEY:
+                headers["Authorization"] = f"Bearer {NVIDIA_API_KEY}"
+
+            probe_payload = {
+                "model": EMBEDDING_MODEL,
+                "input": "health check",
+            }
             with httpx.Client(timeout=10.0) as client:
-                response = client.get(health_url)
+                response = client.post(EMBED_API_URL, headers=headers, json=probe_payload)
                 if response.status_code == 200:
                     print(f"  Embedding service ready (attempt {attempt})")
                     return True
