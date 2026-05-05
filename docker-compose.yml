@@ -155,8 +155,25 @@ services:
       - -lc
       - |
         set -e
-        ollama pull "${OLLAMA_LLM_MODEL:-llama3.2:1b}"
-        ollama pull "${OLLAMA_EMBED_MODEL:-nomic-embed-text:latest}"
+        pull_if_missing() {
+          model="$1"
+          if ollama list | awk 'NR>1 {print $1}' | grep -Fx "$model" >/dev/null 2>&1; then
+            echo "Model already present: $model"
+            return 0
+          fi
+          for attempt in 1 2 3 4 5; do
+            if ollama pull "$model"; then
+              return 0
+            fi
+            echo "Retry pull $model (attempt $attempt failed)"
+            sleep $((attempt * 5))
+          done
+          echo "Failed to pull model: $model"
+          return 1
+        }
+
+        pull_if_missing "${OLLAMA_LLM_MODEL:-llama3.2:1b}"
+        pull_if_missing "${OLLAMA_EMBED_MODEL:-nomic-embed-text:latest}"
     environment:
       - OLLAMA_HOST=http://ollama:11434
       - OLLAMA_LLM_MODEL=${OLLAMA_LLM_MODEL:-llama3.2:1b}
