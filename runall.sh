@@ -42,15 +42,29 @@ info "Starting provider stack"
 docker compose -f "$ROOT_DIR/docker-compose.infra.yml" -f "$ROOT_DIR/docker-compose.yml" up -d --build
 
 info "Waiting for core services"
-for i in $(seq 1 40); do
+for i in $(seq 1 60); do
   if curl -sf "http://localhost/api/health" >/dev/null 2>&1 \
     && curl -sf "http://localhost/psp/health" >/dev/null 2>&1 \
     && curl -sf "http://localhost/apps-sdk/health" >/dev/null 2>&1; then
     ok "Core services are healthy"
     break
   fi
-  if [[ "$i" -eq 40 ]]; then
-    err "Health checks did not pass in time"
+  if [[ "$i" -eq 60 ]]; then
+    err "Core health checks did not pass in time"
+    exit 1
+  fi
+  sleep 3
+done
+
+info "Waiting for agent services"
+for i in $(seq 1 80); do
+  if curl -sf "http://localhost:8005/health" >/dev/null 2>&1 \
+    && curl -sf "http://localhost:8004/health" >/dev/null 2>&1; then
+    ok "Search and recommendation agents are healthy"
+    break
+  fi
+  if [[ "$i" -eq 80 ]]; then
+    err "Agent health checks did not pass in time"
     exit 1
   fi
   sleep 3
