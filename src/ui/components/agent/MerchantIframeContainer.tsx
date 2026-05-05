@@ -15,6 +15,8 @@ interface MerchantIframeContainerProps {
   searchRequest?: { query: string; requestId: number } | null;
 }
 
+type AgentMode = "llm" | "retriever_only" | null;
+
 /**
  * MCP Server base URL - uses nginx proxy in Docker, direct in development
  */
@@ -87,6 +89,8 @@ export function MerchantIframeContainer({
   const [iframeSrc, setIframeSrc] = useState<string | null>(null);
   const [mcpStatus, setMcpStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [discoveredWidgetUri, setDiscoveredWidgetUri] = useState<string | null>(null);
+  const [agentMode, setAgentMode] = useState<AgentMode>(null);
+  const [agentActivity, setAgentActivity] = useState<string>("Waiting for request...");
   const shouldRevealIframe = isIframeLoaded && !isSearchLoading;
 
   // ACP logging for protocol inspector - extract stable functions only
@@ -120,6 +124,43 @@ export function MerchantIframeContainer({
       "*"
     );
   }, []);
+
+  const updateAgentTelemetry = useCallback(
+    (
+      toolOutput: Record<string, unknown> | null,
+      fallbackMode: AgentMode,
+      fallbackActivity: string
+    ) => {
+      if (!toolOutput) {
+        setAgentMode(fallbackMode);
+        setAgentActivity(fallbackActivity);
+        return;
+      }
+
+      const modeValue = toolOutput.agent_mode;
+      const inferredMode: AgentMode =
+        modeValue === "llm" || modeValue === "retriever_only" ? modeValue : fallbackMode;
+
+      const activityValue = toolOutput.agent_activity;
+      const invokedValue =
+        typeof toolOutput._meta === "object" &&
+        toolOutput._meta !== null &&
+        typeof (toolOutput._meta as Record<string, unknown>)["openai/toolInvocation/invoked"] ===
+          "string"
+          ? ((toolOutput._meta as Record<string, unknown>)[
+              "openai/toolInvocation/invoked"
+            ] as string)
+          : null;
+
+      setAgentMode(inferredMode);
+      setAgentActivity(
+        typeof activityValue === "string" && activityValue.trim().length > 0
+          ? activityValue
+          : invokedValue ?? fallbackActivity
+      );
+    },
+    []
+  );
 
   const initializeMCPWidget = useCallback(
     async (query: string) => {
@@ -187,6 +228,12 @@ export function MerchantIframeContainer({
             completeAgentCall(searchEventId, "success", decision);
           }
 
+          updateAgentTelemetry(
+            toolOutput as Record<string, unknown> | null,
+            "retriever_only",
+            toolError ? "Search request failed" : "Search request completed"
+          );
+
           if (toolOutput) {
             latestGlobalsRef.current = {
               toolInput: { query, limit: 3 },
@@ -202,6 +249,7 @@ export function MerchantIframeContainer({
         // Complete the original event with error, include fallback info in the message
         completeEvent(eventId, "error", `${errorMessage} → Fallback: ${FALLBACK_WIDGET_URL}`, 500);
         completeAgentCall(searchEventId, "error", undefined, errorMessage);
+        updateAgentTelemetry(null, "retriever_only", "Search agent unavailable");
 
         setIframeSrc(FALLBACK_WIDGET_URL);
         setMcpStatus("error");
@@ -354,6 +402,12 @@ export function MerchantIframeContainer({
             };
             completeAgentCall(searchEventId, "success", decision);
           }
+
+          updateAgentTelemetry(
+            toolOutput as Record<string, unknown> | null,
+            "retriever_only",
+            toolError ? "Search refresh failed" : "Search refresh completed"
+          );
         } else if (toolError) {
           throw new Error(toolError);
         }
@@ -361,6 +415,7 @@ export function MerchantIframeContainer({
         const errorMessage = error instanceof Error ? error.message : "Failed to search products";
         completeEvent(acpEventId, "error", errorMessage, 500);
         completeAgentCall(searchEventId, "error", undefined, errorMessage);
+        updateAgentTelemetry(null, "retriever_only", "Search refresh failed");
       } finally {
         const elapsed = Date.now() - searchLoadingToken;
         const remaining = MIN_SEARCH_DELAY_MS - elapsed;
@@ -414,6 +469,19 @@ export function MerchantIframeContainer({
         <div className="mcp-status error">
           <span className="mcp-dot error" />
           <span>MCP tool call failed - using fallback</span>
+        </div>
+      )}
+
+      {(agentMode || agentActivity) && (
+        <div className="agent-status">
+          <div className={`agent-mode-chip ${agentMode === "llm" ? "llm" : "retriever"}`}>
+            <span className="chip-label">agent_mode</span>
+            <span className="chip-value">{agentMode ?? "unknown"}</span>
+          </div>
+          <div className="agent-activity-chip" title={agentActivity}>
+            <span className="chip-label">activity</span>
+            <span className="chip-value">{agentActivity}</span>
+          </div>
         </div>
       )}
 
@@ -533,6 +601,62 @@ export function MerchantIframeContainer({
 
         .mcp-dot.error {
           background: #ef4444;
+        }
+
+        .agent-status {
+          position: absolute;
+          top: 44px;
+          left: 8px;
+          right: 8px;
+          display: flex;
+          gap: 8px;
+          z-index: 14;
+          pointer-events: none;
+        }
+
+        .agent-mode-chip,
+        .agent-activity-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          border-radius: 999px;
+          padding: 6px 10px;
+          font-size: 11px;
+          line-height: 1;
+          backdrop-filter: blur(4px);
+          background: rgba(12, 16, 20, 0.78);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          color: rgba(230, 237, 243, 0.88);
+          max-width: 100%;
+        }
+
+        .agent-mode-chip.llm {
+          border-color: rgba(118, 185, 0, 0.55);
+          background: rgba(118, 185, 0, 0.18);
+        }
+
+        .agent-mode-chip.retriever {
+          border-color: rgba(59, 130, 246, 0.5);
+          background: rgba(59, 130, 246, 0.16);
+        }
+
+        .agent-activity-chip {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .chip-label {
+          opacity: 0.68;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          font-weight: 600;
+        }
+
+        .chip-value {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          font-weight: 500;
         }
 
         @keyframes fadeIn {

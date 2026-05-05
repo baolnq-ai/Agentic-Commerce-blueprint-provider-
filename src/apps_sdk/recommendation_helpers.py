@@ -312,27 +312,47 @@ async def call_recommendation_agent(
                 parsed_result.get("recommendations", [])
             )
             enriched = await enrich_recommendations(recommendations)
+            activity = f"llm ranked {len(enriched)} recommendations"
 
             return {
                 "recommendations": enriched,
                 "userIntent": parsed_result.get("user_intent"),
                 "pipelineTrace": parsed_result.get("pipeline_trace"),
+                "agent_mode": "llm",
+                "agent_activity": activity,
             }
     except httpx.TimeoutException:
         logger.error("Recommendation agent timeout")
-        return {"recommendations": [], "error": "Recommendation agent timeout"}
+        return {
+            "recommendations": [],
+            "error": "Recommendation agent timeout",
+            "agent_mode": "llm",
+            "agent_activity": "llm request timed out",
+        }
     except httpx.HTTPStatusError as e:
         logger.error(f"Recommendation agent HTTP error: {e}")
         return {
             "recommendations": [],
             "error": f"Agent error: {e.response.status_code}",
+            "agent_mode": "llm",
+            "agent_activity": f"llm returned HTTP {e.response.status_code}",
         }
     except (httpx.ConnectError, httpx.ConnectTimeout) as e:
         logger.warning(f"Recommendation agent not available: {e}")
-        return {"recommendations": [], "error": "Recommendation agent unavailable"}
+        return {
+            "recommendations": [],
+            "error": "Recommendation agent unavailable",
+            "agent_mode": "llm",
+            "agent_activity": "llm endpoint unavailable",
+        }
     except Exception as e:
         logger.error(f"Recommendation agent error: {e}")
-        return {"recommendations": [], "error": str(e)}
+        return {
+            "recommendations": [],
+            "error": str(e),
+            "agent_mode": "llm",
+            "agent_activity": "llm request failed",
+        }
 
 
 async def enrich_recommendations(

@@ -65,6 +65,8 @@ def _error_search_response(
         "user": DEFAULT_USER,
         "theme": "dark",
         "locale": "en-US",
+        "agent_mode": "retriever_only",
+        "agent_activity": message,
         "_meta": {
             "openai/outputTemplate": "ui://widget/merchant-app.html",
             "openai/toolInvocation/invoking": "Searching products...",
@@ -312,6 +314,7 @@ async def search_products(
         )
 
     logger.info(f"Returning {len(results)} products for query '{query}'")
+    activity = f"retriever matched {len(results)} products"
     return {
         "products": results,
         "query": query,
@@ -320,6 +323,8 @@ async def search_products(
         "user": DEFAULT_USER,
         "theme": "dark",
         "locale": "en-US",
+        "agent_mode": "retriever_only",
+        "agent_activity": activity,
         "_meta": {
             "openai/outputTemplate": "ui://widget/merchant-app.html",
             "openai/toolInvocation/invoking": "Searching products...",
