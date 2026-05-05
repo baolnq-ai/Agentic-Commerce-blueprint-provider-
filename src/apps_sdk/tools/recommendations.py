@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from typing import Any, cast
 
 import httpx
@@ -40,6 +41,8 @@ SEARCH_AGENT_URL = settings.search_agent_url
 MERCHANT_API_URL = settings.merchant_api_url
 SEARCH_MIN_SIMILARITY = settings.search_min_similarity
 SEARCH_DISTANCE_CUTOFF = settings.search_distance_cutoff
+NIM_EMBED_MODEL = os.environ.get("NIM_EMBED_MODEL_NAME", "nvidia/nv-embedqa-e5-v5")
+NIM_RUN_MODE = os.environ.get("NIM_RUN_MODE", "api")
 
 DEFAULT_USER = {
     "id": "user_demo123",
@@ -66,6 +69,8 @@ def _error_search_response(
         "theme": "dark",
         "locale": "en-US",
         "agent_mode": "retriever_only",
+        "agent_model": NIM_EMBED_MODEL,
+        "nim_mode": NIM_RUN_MODE,
         "agent_activity": message,
         "_meta": {
             "openai/outputTemplate": "ui://widget/merchant-app.html",
@@ -324,6 +329,8 @@ async def search_products(
         "theme": "dark",
         "locale": "en-US",
         "agent_mode": "retriever_only",
+        "agent_model": NIM_EMBED_MODEL,
+        "nim_mode": NIM_RUN_MODE,
         "agent_activity": activity,
         "_meta": {
             "openai/outputTemplate": "ui://widget/merchant-app.html",

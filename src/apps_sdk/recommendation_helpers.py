@@ -29,6 +29,8 @@ from src.apps_sdk.schemas import CartItemInput
 
 settings = get_apps_sdk_settings()
 RECOMMENDATION_AGENT_URL = settings.recommendation_agent_url
+NIM_LLM_MODEL = os.environ.get("NIM_LLM_MODEL_NAME", "nvidia/llama-3.1-nemotron-nano-8b-v1")
+NIM_RUN_MODE = os.environ.get("NIM_RUN_MODE", "api")
 
 # Merchant API URL for product lookups
 MERCHANT_API_URL = os.environ.get("MERCHANT_API_URL", "http://localhost:8000")
@@ -319,6 +321,8 @@ async def call_recommendation_agent(
                 "userIntent": parsed_result.get("user_intent"),
                 "pipelineTrace": parsed_result.get("pipeline_trace"),
                 "agent_mode": "llm",
+                "agent_model": NIM_LLM_MODEL,
+                "nim_mode": NIM_RUN_MODE,
                 "agent_activity": activity,
             }
     except httpx.TimeoutException:
@@ -327,6 +331,8 @@ async def call_recommendation_agent(
             "recommendations": [],
             "error": "Recommendation agent timeout",
             "agent_mode": "llm",
+            "agent_model": NIM_LLM_MODEL,
+            "nim_mode": NIM_RUN_MODE,
             "agent_activity": "llm request timed out",
         }
     except httpx.HTTPStatusError as e:
@@ -335,6 +341,8 @@ async def call_recommendation_agent(
             "recommendations": [],
             "error": f"Agent error: {e.response.status_code}",
             "agent_mode": "llm",
+            "agent_model": NIM_LLM_MODEL,
+            "nim_mode": NIM_RUN_MODE,
             "agent_activity": f"llm returned HTTP {e.response.status_code}",
         }
     except (httpx.ConnectError, httpx.ConnectTimeout) as e:
@@ -343,6 +351,8 @@ async def call_recommendation_agent(
             "recommendations": [],
             "error": "Recommendation agent unavailable",
             "agent_mode": "llm",
+            "agent_model": NIM_LLM_MODEL,
+            "nim_mode": NIM_RUN_MODE,
             "agent_activity": "llm endpoint unavailable",
         }
     except Exception as e:
@@ -351,6 +361,8 @@ async def call_recommendation_agent(
             "recommendations": [],
             "error": str(e),
             "agent_mode": "llm",
+            "agent_model": NIM_LLM_MODEL,
+            "nim_mode": NIM_RUN_MODE,
             "agent_activity": "llm request failed",
         }
 

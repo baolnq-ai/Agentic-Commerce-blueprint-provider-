@@ -25,6 +25,14 @@ import {
  */
 type WidgetPage = "browse" | "product_detail" | "checkout";
 
+type RuntimeTelemetry = {
+  mode: string;
+  model: string;
+  runtime: string;
+  activity: string;
+  source: string;
+};
+
 /**
  * State that persists across widget remounts via useWidgetState.
  * Only includes what needs to survive — transient UI state stays in useState.
@@ -178,6 +186,10 @@ export function App() {
   const showEmptyState = browseRecommendations.length === 0;
   const emptyStateMessage =
     toolError ?? "No products found. Try a different search or browse trending items.";
+  const [searchTelemetry, setSearchTelemetry] = useState<RuntimeTelemetry | null>(null);
+  const [recommendationTelemetry, setRecommendationTelemetry] = useState<RuntimeTelemetry | null>(
+    null
+  );
 
   // ── Persisted state (survives widget remount) ──────────────────────────
   const [persisted, setPersisted] = useWidgetState<PersistedWidgetState>(DEFAULT_PERSISTED_STATE);
@@ -237,6 +249,33 @@ export function App() {
     setIsCheckingOut(false);
     updateCurrentPage("browse", null);
   }, [toolOutput, updateCurrentPage]);
+
+  useEffect(() => {
+    if (!toolOutput) return;
+
+    const mode =
+      typeof toolOutput.agent_mode === "string" && toolOutput.agent_mode
+        ? toolOutput.agent_mode
+        : "retriever_only";
+    const model =
+      typeof toolOutput.agent_model === "string" && toolOutput.agent_model
+        ? toolOutput.agent_model
+        : "n/a";
+    const runtime =
+      typeof toolOutput.nim_mode === "string" && toolOutput.nim_mode ? toolOutput.nim_mode : "api";
+    const activity =
+      typeof toolOutput.agent_activity === "string" && toolOutput.agent_activity
+        ? toolOutput.agent_activity
+        : "search products";
+
+    setSearchTelemetry({
+      mode,
+      model,
+      runtime,
+      activity,
+      source: "search-products",
+    });
+  }, [toolOutput]);
 
   // ── Re-sync ACP session on mount if persisted cart is non-empty ─────────
   useEffect(() => {
@@ -470,6 +509,10 @@ export function App() {
         const result = await callTool<{
           recommendations?: EnrichedRec[];
           recommendationRequestId?: string;
+          agent_mode?: string;
+          agent_model?: string;
+          nim_mode?: string;
+          agent_activity?: string;
         }>("get-recommendations", {
           productId,
           productName,
@@ -485,6 +528,15 @@ export function App() {
           typeof result.recommendationRequestId === "string"
             ? result.recommendationRequestId
             : undefined;
+
+        setRecommendationTelemetry({
+          mode: result.agent_mode || "llm",
+          model: result.agent_model || "n/a",
+          runtime: result.nim_mode || "api",
+          activity: result.agent_activity || "generated recommendations",
+          source: "get-recommendations",
+        });
+
         return mapRecommendationsToProducts(
           result.recommendations ?? [],
           recRequestId,
@@ -492,11 +544,46 @@ export function App() {
         );
       } catch (error) {
         console.error("[Widget] Failed to get recommendations:", error);
+        setRecommendationTelemetry({
+          mode: "llm",
+          model: "n/a",
+          runtime: "unknown",
+          activity: "recommendation call failed",
+          source: "get-recommendations",
+        });
         return [];
       }
     },
     [cartItems, cartState.cartId, sessionId]
   );
+
+  const activeTelemetry =
+    currentPage === "browse" ? searchTelemetry : recommendationTelemetry ?? searchTelemetry;
+
+  const renderTelemetry = () => {
+    if (!activeTelemetry) return null;
+    return (
+      <div className="mx-5 mb-2 mt-3 rounded-lg border border-default bg-surface-elevated/75 px-3 py-2 text-[11px] text-text-secondary">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-semibold text-text">runtime</span>
+          <span className="rounded-full border border-default px-2 py-0.5">page: {currentPage}</span>
+          <span className="rounded-full border border-default px-2 py-0.5">
+            mode: {activeTelemetry.mode}
+          </span>
+          <span className="rounded-full border border-default px-2 py-0.5">
+            model: {activeTelemetry.model}
+          </span>
+          <span className="rounded-full border border-default px-2 py-0.5">
+            source: {activeTelemetry.source}
+          </span>
+          <span className="rounded-full border border-default px-2 py-0.5">
+            runtime: {activeTelemetry.runtime}
+          </span>
+        </div>
+        <div className="mt-1 truncate">activity: {activeTelemetry.activity}</div>
+      </div>
+    );
+  };
 
   // Navigate to product detail page
   const handleProductClick = useCallback(
@@ -644,6 +731,7 @@ export function App() {
   if (currentPage === "product_detail" && selectedProduct) {
     return (
       <div className="min-h-screen bg-surface transition-colors">
+        {renderTelemetry()}
         <ProductDetailPage
           product={selectedProduct}
           recommendations={productRecommendations}
@@ -668,6 +756,7 @@ export function App() {
 
     return (
       <div className="min-h-screen bg-surface transition-colors">
+        {renderTelemetry()}
         <CheckoutPage
           cartItems={cartItems}
           cartState={cartState}
@@ -704,6 +793,8 @@ export function App() {
         cartItemCount={cartState.itemCount}
         onCartClick={handleCartClick}
       />
+
+      {renderTelemetry()}
 
       {/* Main Content - Only show recommendations */}
       <div className="px-5 pb-6">

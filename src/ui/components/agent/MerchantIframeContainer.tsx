@@ -90,6 +90,8 @@ export function MerchantIframeContainer({
   const [mcpStatus, setMcpStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [discoveredWidgetUri, setDiscoveredWidgetUri] = useState<string | null>(null);
   const [agentMode, setAgentMode] = useState<AgentMode>(null);
+  const [agentModel, setAgentModel] = useState<string>("n/a");
+  const [nimMode, setNimMode] = useState<string>("api");
   const [agentActivity, setAgentActivity] = useState<string>("Waiting for request...");
   const shouldRevealIframe = isIframeLoaded && !isSearchLoading;
 
@@ -133,6 +135,8 @@ export function MerchantIframeContainer({
     ) => {
       if (!toolOutput) {
         setAgentMode(fallbackMode);
+        setAgentModel("n/a");
+        setNimMode("unknown");
         setAgentActivity(fallbackActivity);
         return;
       }
@@ -142,6 +146,14 @@ export function MerchantIframeContainer({
         modeValue === "llm" || modeValue === "retriever_only" ? modeValue : fallbackMode;
 
       const activityValue = toolOutput.agent_activity;
+      const modelValue =
+        typeof toolOutput.agent_model === "string" && toolOutput.agent_model.trim().length > 0
+          ? toolOutput.agent_model
+          : "n/a";
+      const nimModeValue =
+        typeof toolOutput.nim_mode === "string" && toolOutput.nim_mode.trim().length > 0
+          ? toolOutput.nim_mode
+          : "api";
       const invokedValue =
         typeof toolOutput._meta === "object" &&
         toolOutput._meta !== null &&
@@ -153,6 +165,8 @@ export function MerchantIframeContainer({
           : null;
 
       setAgentMode(inferredMode);
+      setAgentModel(modelValue);
+      setNimMode(nimModeValue);
       setAgentActivity(
         typeof activityValue === "string" && activityValue.trim().length > 0
           ? activityValue
@@ -478,6 +492,14 @@ export function MerchantIframeContainer({
             <span className="chip-label">agent_mode</span>
             <span className="chip-value">{agentMode ?? "unknown"}</span>
           </div>
+          <div className="agent-model-chip" title={agentModel}>
+            <span className="chip-label">model</span>
+            <span className="chip-value">{agentModel}</span>
+          </div>
+          <div className="agent-runtime-chip" title={nimMode}>
+            <span className="chip-label">runtime</span>
+            <span className="chip-value">{nimMode}</span>
+          </div>
           <div className="agent-activity-chip" title={agentActivity}>
             <span className="chip-label">activity</span>
             <span className="chip-value">{agentActivity}</span>
@@ -615,6 +637,8 @@ export function MerchantIframeContainer({
         }
 
         .agent-mode-chip,
+        .agent-model-chip,
+        .agent-runtime-chip,
         .agent-activity-chip {
           display: inline-flex;
           align-items: center;
@@ -643,6 +667,14 @@ export function MerchantIframeContainer({
         .agent-activity-chip {
           flex: 1;
           min-width: 0;
+        }
+
+        .agent-model-chip {
+          max-width: 220px;
+        }
+
+        .agent-runtime-chip {
+          max-width: 120px;
         }
 
         .chip-label {

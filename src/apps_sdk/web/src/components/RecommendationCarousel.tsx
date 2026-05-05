@@ -36,6 +36,16 @@ function ProductCard({ product, onAddToCart, onProductClick }: ProductCardProps)
     }
   }, [onProductClick, product]);
 
+  const handleViewDetails = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (onProductClick) {
+        onProductClick(product);
+      }
+    },
+    [onProductClick, product]
+  );
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if ((e.key === "Enter" || e.key === " ") && onProductClick) {
@@ -82,10 +92,17 @@ function ProductCard({ product, onAddToCart, onProductClick }: ProductCardProps)
       </div>
 
       {/* Add to Cart Button */}
-      <div className="px-2.5 pb-2.5">
+      <div className="px-2.5 pb-2.5 flex gap-1.5">
+        <button
+          onClick={handleViewDetails}
+          className="flex-1 rounded-full border border-default bg-transparent px-2 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:border-accent/40 hover:text-text active:scale-[0.98]"
+          aria-label={`View ${product.name} details`}
+        >
+          View Details
+        </button>
         <button
           onClick={handleAddToCart}
-          className="flex w-full items-center justify-center gap-1 rounded-full border border-accent/30 bg-transparent px-2 py-1.5 text-xs font-medium text-accent transition-colors hover:border-accent hover:bg-accent/5 active:scale-[0.98] dark:border-accent/40 dark:hover:border-accent/70 dark:hover:bg-accent/10"
+          className="flex flex-1 items-center justify-center gap-1 rounded-full border border-accent/30 bg-transparent px-2 py-1.5 text-xs font-medium text-accent transition-colors hover:border-accent hover:bg-accent/5 active:scale-[0.98] dark:border-accent/40 dark:hover:border-accent/70 dark:hover:bg-accent/10"
           aria-label={`Add ${product.name} to cart`}
         >
           <ShoppingCart className="h-3.5 w-3.5" strokeWidth={2} />
