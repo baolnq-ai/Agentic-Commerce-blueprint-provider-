@@ -43,49 +43,6 @@ MERCHANT_API_URL = os.environ.get("MERCHANT_API_URL", "http://localhost:8000")
 logger = logging.getLogger("src.apps_sdk.main")
 
 
-async def _local_catalog_recommendations(
-    *,
-    product_id: str,
-    cart_items: list[CartItemInput],
-    limit: int = 3,
-) -> list[dict[str, Any]]:
-    """Fallback recommendations in local_nim mode without upstream LLM dependency."""
-    blocked_ids = {product_id}
-    for item in cart_items:
-        blocked_ids.add(item.product_id)
-
-    try:
-        async with httpx.AsyncClient(timeout=6.0) as client:
-            response = await client.get(f"{settings.merchant_api_url}/products", params={"limit": 100})
-            response.raise_for_status()
-            raw_products = response.json()
-    except Exception as e:
-        logger.warning("Local catalog fallback recommendations failed: %s", e)
-        return []
-
-    if not isinstance(raw_products, list):
-        return []
-
-    picks: list[dict[str, Any]] = []
-    for idx, product in enumerate(raw_products):
-        if not isinstance(product, dict):
-            continue
-        pid = str(product.get("id") or "")
-        if not pid or pid in blocked_ids:
-            continue
-        picks.append(
-            {
-                "product_id": pid,
-                "product_name": str(product.get("name") or ""),
-                "rank": len(picks) + 1,
-                "reasoning": "Local catalog fallback",
-            }
-        )
-        if len(picks) >= limit:
-            break
-    return picks
-
-
 def search_meta() -> dict[str, Any]:
     """Metadata for search products (entry point tool)."""
     return {
@@ -384,21 +341,6 @@ async def call_recommendation_agent(
             }
     except httpx.TimeoutException:
         logger.error("Recommendation agent timeout")
-        if NIM_RUN_MODE == "local_nim":
-            fallback = await _local_catalog_recommendations(
-                product_id=product_id,
-                cart_items=cart_items,
-            )
-            enriched = await enrich_recommendations(fallback)
-            return {
-                "recommendations": enriched,
-                "userIntent": "local fallback",
-                "pipelineTrace": {"mode": "local_catalog_fallback", "reason": "timeout"},
-                "agent_mode": "llm",
-                "agent_model": NIM_LLM_MODEL,
-                "nim_mode": NIM_RUN_MODE,
-                "agent_activity": f"local fallback ranked {len(enriched)} recommendations",
-            }
         return {
             "recommendations": [],
             "error": "Recommendation agent timeout",
@@ -409,21 +351,6 @@ async def call_recommendation_agent(
         }
     except httpx.HTTPStatusError as e:
         logger.error(f"Recommendation agent HTTP error: {e}")
-        if NIM_RUN_MODE == "local_nim":
-            fallback = await _local_catalog_recommendations(
-                product_id=product_id,
-                cart_items=cart_items,
-            )
-            enriched = await enrich_recommendations(fallback)
-            return {
-                "recommendations": enriched,
-                "userIntent": "local fallback",
-                "pipelineTrace": {"mode": "local_catalog_fallback", "reason": f"http_{e.response.status_code}"},
-                "agent_mode": "llm",
-                "agent_model": NIM_LLM_MODEL,
-                "nim_mode": NIM_RUN_MODE,
-                "agent_activity": f"local fallback ranked {len(enriched)} recommendations",
-            }
         return {
             "recommendations": [],
             "error": f"Agent error: {e.response.status_code}",
@@ -434,21 +361,6 @@ async def call_recommendation_agent(
         }
     except (httpx.ConnectError, httpx.ConnectTimeout) as e:
         logger.warning(f"Recommendation agent not available: {e}")
-        if NIM_RUN_MODE == "local_nim":
-            fallback = await _local_catalog_recommendations(
-                product_id=product_id,
-                cart_items=cart_items,
-            )
-            enriched = await enrich_recommendations(fallback)
-            return {
-                "recommendations": enriched,
-                "userIntent": "local fallback",
-                "pipelineTrace": {"mode": "local_catalog_fallback", "reason": "unavailable"},
-                "agent_mode": "llm",
-                "agent_model": NIM_LLM_MODEL,
-                "nim_mode": NIM_RUN_MODE,
-                "agent_activity": f"local fallback ranked {len(enriched)} recommendations",
-            }
         return {
             "recommendations": [],
             "error": "Recommendation agent unavailable",
@@ -459,21 +371,6 @@ async def call_recommendation_agent(
         }
     except Exception as e:
         logger.error(f"Recommendation agent error: {e}")
-        if NIM_RUN_MODE == "local_nim":
-            fallback = await _local_catalog_recommendations(
-                product_id=product_id,
-                cart_items=cart_items,
-            )
-            enriched = await enrich_recommendations(fallback)
-            return {
-                "recommendations": enriched,
-                "userIntent": "local fallback",
-                "pipelineTrace": {"mode": "local_catalog_fallback", "reason": "exception"},
-                "agent_mode": "llm",
-                "agent_model": NIM_LLM_MODEL,
-                "nim_mode": NIM_RUN_MODE,
-                "agent_activity": f"local fallback ranked {len(enriched)} recommendations",
-            }
         return {
             "recommendations": [],
             "error": str(e),

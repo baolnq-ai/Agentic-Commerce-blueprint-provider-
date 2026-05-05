@@ -161,47 +161,6 @@ async def _fetch_product_from_merchant(product_id: str) -> dict[str, Any] | None
         return None
 
 
-async def _local_catalog_search(query: str, limit: int) -> list[dict[str, Any]]:
-    """Fallback search for local_nim mode when NAT search agent is unavailable."""
-    query_text = query.strip().lower()
-    try:
-        async with httpx.AsyncClient(timeout=6.0) as client:
-            response = await client.get(f"{MERCHANT_API_URL}/products", params={"limit": 100})
-            response.raise_for_status()
-            raw_products = response.json()
-    except Exception as e:
-        logger.warning("Local catalog fallback search failed: %s", e)
-        return []
-
-    if not isinstance(raw_products, list):
-        return []
-
-    products: list[dict[str, Any]] = []
-    for product in raw_products:
-        if not isinstance(product, dict):
-            continue
-        name = str(product.get("name") or "")
-        sku = str(product.get("sku") or "")
-        haystack = f"{name} {sku}".lower()
-        if query_text and query_text not in haystack:
-            continue
-        products.append(
-            {
-                "id": str(product.get("id") or ""),
-                "sku": sku,
-                "name": name,
-                "basePrice": product.get("base_price", 0),
-                "stockCount": product.get("stock_count", 0),
-                "category": product.get("category", ""),
-                "description": product.get("description", ""),
-                "imageUrl": product.get("image_url"),
-            }
-        )
-        if len(products) >= limit:
-            break
-    return products
-
-
 async def call_search_agent(
     query: str,
     category: str | None,
@@ -293,29 +252,6 @@ async def search_products(
     agent_result = await call_search_agent(query=query, category=category, limit=limit)
     if agent_result.get("error"):
         logger.warning(f"Search agent error: {agent_result.get('error')}")
-        if NIM_RUN_MODE == "local_nim":
-            fallback_products = await _local_catalog_search(query=query, limit=limit)
-            if fallback_products:
-                activity = f"local catalog matched {len(fallback_products)} products"
-                return {
-                    "products": fallback_products,
-                    "query": query,
-                    "category": category,
-                    "totalResults": len(fallback_products),
-                    "user": DEFAULT_USER,
-                    "theme": "dark",
-                    "locale": "en-US",
-                    "agent_mode": "retriever_only",
-                    "agent_model": NIM_EMBED_MODEL,
-                    "nim_mode": NIM_RUN_MODE,
-                    "agent_activity": activity,
-                    "_meta": {
-                        "openai/outputTemplate": "ui://widget/merchant-app.html",
-                        "openai/toolInvocation/invoking": "Searching products...",
-                        "openai/toolInvocation/invoked": f"Found {len(fallback_products)} products",
-                        "openai/widgetAccessible": True,
-                    },
-                }
         return _error_search_response(
             query=query,
             category=category,
