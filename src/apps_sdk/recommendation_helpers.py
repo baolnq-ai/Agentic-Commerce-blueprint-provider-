@@ -30,7 +30,11 @@ from src.apps_sdk.schemas import CartItemInput
 settings = get_apps_sdk_settings()
 RECOMMENDATION_AGENT_URL = settings.recommendation_agent_url
 NIM_LLM_MODEL = os.environ.get("NIM_LLM_MODEL_NAME", "nvidia/llama-3.1-nemotron-nano-8b-v1")
-NIM_RUN_MODE = os.environ.get("NIM_RUN_MODE", "api")
+NIM_RUN_MODE = os.environ.get("NIM_RUN_MODE") or (
+    "local_nim"
+    if "host.docker.internal" in os.environ.get("NIM_LLM_BASE_URL", "")
+    else "api"
+)
 
 # Merchant API URL for product lookups
 MERCHANT_API_URL = os.environ.get("MERCHANT_API_URL", "http://localhost:8000")

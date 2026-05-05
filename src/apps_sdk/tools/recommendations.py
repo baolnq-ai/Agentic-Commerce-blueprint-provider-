@@ -42,7 +42,11 @@ MERCHANT_API_URL = settings.merchant_api_url
 SEARCH_MIN_SIMILARITY = settings.search_min_similarity
 SEARCH_DISTANCE_CUTOFF = settings.search_distance_cutoff
 NIM_EMBED_MODEL = os.environ.get("NIM_EMBED_MODEL_NAME", "nvidia/nv-embedqa-e5-v5")
-NIM_RUN_MODE = os.environ.get("NIM_RUN_MODE", "api")
+NIM_RUN_MODE = os.environ.get("NIM_RUN_MODE") or (
+    "local_nim"
+    if "host.docker.internal" in os.environ.get("NIM_EMBED_BASE_URL", "")
+    else "api"
+)
 
 DEFAULT_USER = {
     "id": "user_demo123",
