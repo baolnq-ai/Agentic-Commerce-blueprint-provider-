@@ -73,13 +73,13 @@ if [[ "$NIM_RUN_MODE" == "local_nim" ]]; then
   "${NIM_CMD[@]}" up -d
 
   info "Waiting for local NVIDIA NIM endpoints"
-  for i in $(seq 1 120); do
+  for i in $(seq 1 240); do
     if curl -sf --connect-timeout 3 --max-time 8 "${NIM_LLM_BASE_URL%/}/models" >/dev/null 2>&1 \
       && curl -sf --connect-timeout 3 --max-time 8 "${NIM_EMBED_BASE_URL%/}/models" >/dev/null 2>&1; then
       ok "Local NVIDIA NIM endpoints are ready"
       break
     fi
-    if [[ "$i" -eq 120 ]]; then
+    if [[ "$i" -eq 240 ]]; then
       err "Local NVIDIA NIM endpoints did not become ready in time"
       exit 1
     fi
