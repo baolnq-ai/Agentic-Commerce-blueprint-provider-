@@ -311,6 +311,7 @@ services:
       promotion-agent:
         condition: service_started
     networks:
+      - acp-network
       - acp-infra-network
     restart: "no"
 
