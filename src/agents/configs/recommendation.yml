@@ -43,14 +43,14 @@ llms:
   nim_llm:
     _type: openai
     api_key: ${NVIDIA_API_KEY}
-    base_url: ${NIM_LLM_BASE_URL:-https://integrate.api.nvidia.com/v1}
-    model_name: ${NIM_LLM_MODEL_NAME:-nvidia/llama-3.1-nemotron-nano-8b-v1}
+    base_url: ${NIM_LLM_BASE_URL}
+    model_name: ${NIM_LLM_MODEL_NAME}
     temperature: 0.1
   nim_llm_nli:
     _type: openai
     api_key: ${NVIDIA_API_KEY}
-    base_url: ${NIM_LLM_BASE_URL:-https://integrate.api.nvidia.com/v1}
-    model_name: ${NIM_LLM_MODEL_NAME:-nvidia/llama-3.1-nemotron-nano-8b-v1}
+    base_url: ${NIM_LLM_BASE_URL}
+    model_name: ${NIM_LLM_MODEL_NAME}
     temperature: 0.0
 
   # -- Evaluation LLMs (judge model, not the main workflow) --------------------
@@ -69,8 +69,8 @@ llms:
 embedders:
   product_embedder:
     _type: nim
-    base_url: ${NIM_EMBED_BASE_URL:-https://integrate.api.nvidia.com/v1}
-    model_name: ${NIM_EMBED_MODEL_NAME:-nvidia/nv-embedqa-e5-v5}
+    base_url: ${NIM_EMBED_BASE_URL}
+    model_name: ${NIM_EMBED_MODEL_NAME}
     truncate: "END"
 
 retrievers:

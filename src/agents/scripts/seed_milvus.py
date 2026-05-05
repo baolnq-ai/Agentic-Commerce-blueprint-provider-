@@ -150,6 +150,17 @@ def wait_for_milvus() -> bool:
     return False
 
 
+def _collection_vector_dim(collection: Any) -> int | None:
+    for field in collection.schema.fields:
+        if field.name == "vector":
+            dim = field.params.get("dim")
+            try:
+                return int(dim)
+            except (TypeError, ValueError):
+                return None
+    return None
+
+
 def check_collection_exists_with_data() -> bool:
     """
     Check if the collection exists and has data.
@@ -165,6 +176,14 @@ def check_collection_exists_with_data() -> bool:
     
     collection = Collection(COLLECTION_NAME)
     collection.load()
+    existing_dim = _collection_vector_dim(collection)
+    if existing_dim != EMBEDDING_DIM:
+        print(
+            f"  Collection '{COLLECTION_NAME}' vector dim is {existing_dim}, "
+            f"expected {EMBEDDING_DIM}; reseeding"
+        )
+        return False
+
     count = collection.num_entities
     
     if count > 0:
