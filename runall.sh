@@ -57,13 +57,13 @@ for i in $(seq 1 60); do
 done
 
 info "Waiting for agent services"
-for i in $(seq 1 80); do
+for i in $(seq 1 300); do
   if curl -sf "http://localhost:8005/health" >/dev/null 2>&1 \
     && curl -sf "http://localhost:8004/health" >/dev/null 2>&1; then
     ok "Search and recommendation agents are healthy"
     break
   fi
-  if [[ "$i" -eq 80 ]]; then
+  if [[ "$i" -eq 300 ]]; then
     err "Agent health checks did not pass in time"
     exit 1
   fi
