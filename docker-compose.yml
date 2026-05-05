@@ -130,68 +130,6 @@ services:
       - acp-infra-network
     restart: unless-stopped
 
-  # Local model runtime for strict local_nim mode
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama
-    profiles:
-      - local-model
-    expose:
-      - "11434"
-    volumes:
-      - ollama-data:/root/.ollama
-    healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 10s
-      timeout: 5s
-      retries: 30
-    networks:
-      - acp-network
-    restart: unless-stopped
-
-  ollama-init:
-    image: ollama/ollama:latest
-    container_name: ollama-init
-    profiles:
-      - local-model
-    depends_on:
-      ollama:
-        condition: service_healthy
-    entrypoint:
-      - /bin/sh
-      - -lc
-      - |
-        set -e
-        pull_if_missing() {
-          model="$$1"
-          if ollama list | awk 'NR>1 {print $$1}' | grep -Fx "$$model" >/dev/null 2>&1; then
-            echo "Model already present: $$model"
-            return 0
-          fi
-          for attempt in 1 2 3 4 5; do
-            if ollama pull "$$model"; then
-              return 0
-            fi
-            echo "Retry pull $$model (attempt $$attempt failed)"
-            sleep $$((attempt * 5))
-          done
-          echo "Failed to pull model: $$model"
-          return 1
-        }
-
-        llm_model="$${OLLAMA_LLM_MODEL:-llama3.2:1b}"
-        embed_model="$${OLLAMA_EMBED_MODEL:-nomic-embed-text:latest}"
-
-        pull_if_missing "$$llm_model"
-        pull_if_missing "$$embed_model"
-    environment:
-      - OLLAMA_HOST=http://ollama:11434
-      - OLLAMA_LLM_MODEL=${OLLAMA_LLM_MODEL}
-      - OLLAMA_EMBED_MODEL=${OLLAMA_EMBED_MODEL}
-    networks:
-      - acp-network
-    restart: "no"
-
   # =============================================================================
   # NAT AGENTS (all share the same base image)
   # =============================================================================
@@ -213,6 +151,8 @@ services:
       - NIM_RUN_MODE=${NIM_RUN_MODE:-api}
       - NIM_LLM_BASE_URL=${NIM_LLM_BASE_URL:-https://integrate.api.nvidia.com/v1}
       - NIM_LLM_MODEL_NAME=${NIM_LLM_MODEL_NAME:-nvidia/llama-3.1-nemotron-nano-8b-v1}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
       interval: 30s
@@ -238,6 +178,8 @@ services:
       - NIM_RUN_MODE=${NIM_RUN_MODE:-api}
       - NIM_LLM_BASE_URL=${NIM_LLM_BASE_URL:-https://integrate.api.nvidia.com/v1}
       - NIM_LLM_MODEL_NAME=${NIM_LLM_MODEL_NAME:-nvidia/llama-3.1-nemotron-nano-8b-v1}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
       interval: 30s
@@ -269,6 +211,8 @@ services:
       - NIM_LLM_MODEL_NAME=${NIM_LLM_MODEL_NAME:-nvidia/llama-3.1-nemotron-nano-8b-v1}
       - NIM_EMBED_BASE_URL=${NIM_EMBED_BASE_URL:-https://integrate.api.nvidia.com/v1}
       - NIM_EMBED_MODEL_NAME=${NIM_EMBED_MODEL_NAME:-nvidia/nv-embedqa-e5-v5}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
       interval: 30s
@@ -300,6 +244,8 @@ services:
       - NIM_LLM_MODEL_NAME=${NIM_LLM_MODEL_NAME:-nvidia/llama-3.1-nemotron-nano-8b-v1}
       - NIM_EMBED_BASE_URL=${NIM_EMBED_BASE_URL:-https://integrate.api.nvidia.com/v1}
       - NIM_EMBED_MODEL_NAME=${NIM_EMBED_MODEL_NAME:-nvidia/nv-embedqa-e5-v5}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8005/health"]
       interval: 30s
@@ -331,6 +277,8 @@ services:
       - NIM_RUN_MODE=${NIM_RUN_MODE:-api}
       - NIM_EMBED_BASE_URL=${NIM_EMBED_BASE_URL:-https://integrate.api.nvidia.com/v1}
       - NIM_EMBED_MODEL_NAME=${NIM_EMBED_MODEL_NAME:-nvidia/nv-embedqa-e5-v5}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
       # Set to "true" to force re-seeding even if data exists
       # - FORCE_RESEED=false
     depends_on:
@@ -357,5 +305,3 @@ networks:
 volumes:
   acp-data:
     name: acp-data
-  ollama-data:
-    name: ollama-data

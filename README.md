@@ -51,7 +51,8 @@ Suggested Hub contract fields are included:
 
 - Docker Engine 24+
 - Docker Compose v2
-- NVIDIA API key in .env
+- For `NIM_RUN_MODE=api`: NVIDIA API key in `.env`
+- For `NIM_RUN_MODE=local_nim`: NVIDIA Container Toolkit + GPU runtime (`nvidia`), and optional NVIDIA API key for model/bootstrap access
 
 Create .env from template if missing:
 
@@ -59,11 +60,21 @@ Create .env from template if missing:
 cp env.example .env
 ```
 
-Set:
+Set for API mode:
 
 ```env
 NVIDIA_API_KEY=nvapi-...
 ```
+
+Set for local mode:
+
+```env
+NIM_RUN_MODE=local_nim
+NIM_LLM_BASE_URL=http://host.docker.internal:8010/v1
+NIM_EMBED_BASE_URL=http://host.docker.internal:8011/v1
+```
+
+When `NIM_RUN_MODE=local_nim`, `runall.sh` brings up local NIM services from `docker-compose-nim.yml`, waits for `/v1/models` on both LLM and embedding endpoints, then starts the provider stack.
 
 ## Notes
 

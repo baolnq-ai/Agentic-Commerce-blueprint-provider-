@@ -19,10 +19,17 @@ ok()   { printf "${GREEN}[OK]${NC}    %s\n" "$1"; }
 warn() { printf "${YELLOW}[WARN]${NC}  %s\n" "$1"; }
 
 info "Stopping Docker stack..."
-if COMPOSE_PROFILES="${COMPOSE_PROFILES:-local-model}" docker compose -f "$ROOT_DIR/docker-compose.infra.yml" -f "$ROOT_DIR/docker-compose.yml" down >/dev/null 2>&1; then
+if docker compose -f "$ROOT_DIR/docker-compose.infra.yml" -f "$ROOT_DIR/docker-compose.yml" down >/dev/null 2>&1; then
     ok "Docker stack stopped"
 else
     warn "Docker stack not running or docker compose down failed"
+fi
+
+info "Stopping local NVIDIA NIM runtime..."
+if docker compose -f "$ROOT_DIR/docker-compose-nim.yml" down >/dev/null 2>&1; then
+    ok "NIM runtime stopped"
+else
+    warn "NIM runtime not running or docker compose down failed"
 fi
 
 if [ ! -f "$PID_FILE" ]; then

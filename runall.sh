@@ -46,33 +46,55 @@ if [[ "$NIM_RUN_MODE" == "api" ]]; then
   fi
 else
   NVIDIA_API_KEY="${NVIDIA_API_KEY:-local-nim}"
-  NIM_LLM_BASE_URL="${NIM_LLM_BASE_URL:-http://ollama:11434/v1}"
-  NIM_EMBED_BASE_URL="${NIM_EMBED_BASE_URL:-http://ollama:11434/v1}"
-  if [[ -z "${NIM_LLM_MODEL_NAME:-}" || "${NIM_LLM_MODEL_NAME}" == "nvidia/llama-3.1-nemotron-nano-8b-v1" ]]; then
-    NIM_LLM_MODEL_NAME="${OLLAMA_LLM_MODEL:-llama3.2:1b}"
-  fi
-  if [[ -z "${NIM_EMBED_MODEL_NAME:-}" || "${NIM_EMBED_MODEL_NAME}" == "nvidia/nv-embedqa-e5-v5" ]]; then
-    NIM_EMBED_MODEL_NAME="${OLLAMA_EMBED_MODEL:-nomic-embed-text:latest}"
-  fi
+  NIM_LLM_BASE_URL="${NIM_LLM_BASE_URL:-http://host.docker.internal:8010/v1}"
+  NIM_EMBED_BASE_URL="${NIM_EMBED_BASE_URL:-http://host.docker.internal:8011/v1}"
+  NIM_LLM_MAX_MODEL_LEN="${NIM_LLM_MAX_MODEL_LEN:-4096}"
+  NIM_LLM_KVCACHE_PERCENT="${NIM_LLM_KVCACHE_PERCENT:-0.55}"
+  NIM_LLM_RELAX_MEM_CONSTRAINTS="${NIM_LLM_RELAX_MEM_CONSTRAINTS:-1}"
+  NIM_LLM_NUM_KV_CACHE_SEQ_LENS="${NIM_LLM_NUM_KV_CACHE_SEQ_LENS:-1}"
+  NIM_LLM_LOW_MEMORY_MODE="${NIM_LLM_LOW_MEMORY_MODE:-1}"
 fi
 
 export NVIDIA_API_KEY NIM_RUN_MODE NIM_LLM_BASE_URL NIM_EMBED_BASE_URL NIM_LLM_MODEL_NAME NIM_EMBED_MODEL_NAME
-export OLLAMA_LLM_MODEL="${OLLAMA_LLM_MODEL:-llama3.2:1b}"
-export OLLAMA_EMBED_MODEL="${OLLAMA_EMBED_MODEL:-nomic-embed-text:latest}"
+export NIM_LLM_MAX_MODEL_LEN NIM_LLM_KVCACHE_PERCENT NIM_LLM_RELAX_MEM_CONSTRAINTS NIM_LLM_NUM_KV_CACHE_SEQ_LENS NIM_LLM_LOW_MEMORY_MODE
 
 COMPOSE_FILES=(-f "$ROOT_DIR/docker-compose.infra.yml" -f "$ROOT_DIR/docker-compose.yml")
 COMPOSE_CMD=(docker compose "${COMPOSE_FILES[@]}")
+NIM_COMPOSE=(-f "$ROOT_DIR/docker-compose-nim.yml")
+NIM_CMD=(docker compose "${NIM_COMPOSE[@]}")
 
 if ! docker network inspect acp-infra-network >/dev/null 2>&1; then
   docker network create acp-infra-network >/dev/null
   ok "Created network acp-infra-network"
 fi
 
-if [[ "$NIM_RUN_MODE" == "local_nim" && ( "$NIM_LLM_BASE_URL" == *"://ollama:"* || "$NIM_EMBED_BASE_URL" == *"://ollama:"* ) ]]; then
-  export COMPOSE_PROFILES="${COMPOSE_PROFILES:-local-model}"
-  info "Preparing bundled local model runtime"
-  "${COMPOSE_CMD[@]}" up -d ollama
-  "${COMPOSE_CMD[@]}" run --rm ollama-init
+if [[ "$NIM_RUN_MODE" == "local_nim" ]]; then
+  info "Starting local NVIDIA NIM runtime"
+  "${NIM_CMD[@]}" up -d
+
+  info "Waiting for local NVIDIA NIM endpoints"
+  for i in $(seq 1 120); do
+    if curl -sf --connect-timeout 3 --max-time 8 "${NIM_LLM_BASE_URL%/}/models" >/dev/null 2>&1 \
+      && curl -sf --connect-timeout 3 --max-time 8 "${NIM_EMBED_BASE_URL%/}/models" >/dev/null 2>&1; then
+      ok "Local NVIDIA NIM endpoints are ready"
+      break
+    fi
+    if [[ "$i" -eq 120 ]]; then
+      err "Local NVIDIA NIM endpoints did not become ready in time"
+      exit 1
+    fi
+    sleep 5
+  done
+
+  info "Validating local NVIDIA NIM endpoints"
+  if ! curl -sf --connect-timeout 3 --max-time 8 "${NIM_LLM_BASE_URL%/}/models" >/dev/null 2>&1; then
+    err "Local NIM LLM endpoint is not reachable: ${NIM_LLM_BASE_URL%/}/models"
+    exit 1
+  fi
+  if ! curl -sf --connect-timeout 3 --max-time 8 "${NIM_EMBED_BASE_URL%/}/models" >/dev/null 2>&1; then
+    err "Local NIM embedding endpoint is not reachable: ${NIM_EMBED_BASE_URL%/}/models"
+    exit 1
+  fi
 fi
 
 info "Starting provider stack"
@@ -80,9 +102,9 @@ info "Starting provider stack"
 
 info "Waiting for core services"
 for i in $(seq 1 60); do
-  if curl -sf "http://localhost:${HTTP_HOST_PORT:-80}/api/health" >/dev/null 2>&1 \
-    && curl -sf "http://localhost:${HTTP_HOST_PORT:-80}/psp/health" >/dev/null 2>&1 \
-    && curl -sf "http://localhost:${HTTP_HOST_PORT:-80}/apps-sdk/health" >/dev/null 2>&1; then
+  if curl -sf --connect-timeout 3 --max-time 8 "http://localhost:${HTTP_HOST_PORT:-80}/api/health" >/dev/null 2>&1 \
+    && curl -sf --connect-timeout 3 --max-time 8 "http://localhost:${HTTP_HOST_PORT:-80}/psp/health" >/dev/null 2>&1 \
+    && curl -sf --connect-timeout 3 --max-time 8 "http://localhost:${HTTP_HOST_PORT:-80}/apps-sdk/health" >/dev/null 2>&1; then
     ok "Core services are healthy"
     break
   fi
