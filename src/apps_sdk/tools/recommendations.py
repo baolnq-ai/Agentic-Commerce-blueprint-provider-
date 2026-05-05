@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import json
 import logging
-from difflib import SequenceMatcher
 from typing import Any, cast
 
 import httpx
@@ -151,63 +150,6 @@ async def _fetch_product_from_merchant(product_id: str) -> dict[str, Any] | None
         return None
 
 
-async def _fallback_search_from_merchant(
-    query: str,
-    category: str | None,
-    limit: int,
-) -> list[dict[str, Any]]:
-    """Fallback search directly from merchant catalog when NAT agent is unavailable."""
-    def _term_matches(term: str, haystack_tokens: list[str]) -> bool:
-        if term in haystack_tokens:
-            return True
-        for token in haystack_tokens:
-            if term in token or token in term:
-                return True
-            if SequenceMatcher(None, term, token).ratio() >= 0.78:
-                return True
-        return False
-
-    try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
-            response = await client.get(
-                f"{MERCHANT_API_URL}/products",
-                params={"limit": max(limit * 4, 40)},
-            )
-            response.raise_for_status()
-            catalog = response.json()
-
-        terms = [term for term in query.lower().split() if term]
-        category_term = category.lower() if category else None
-
-        filtered: list[dict[str, Any]] = []
-        for item in catalog:
-            name = str(item.get("name", "")).lower()
-            sku = str(item.get("sku", "")).lower()
-            haystack = f"{name} {sku}"
-            haystack_tokens = [token for token in haystack.split() if token]
-            if terms and not all(_term_matches(term, haystack_tokens) for term in terms):
-                continue
-            if category_term and category_term not in haystack:
-                continue
-            filtered.append(
-                {
-                    "id": item.get("id"),
-                    "sku": item.get("sku", ""),
-                    "name": item.get("name", ""),
-                    "basePrice": item.get("base_price", 0),
-                    "stockCount": item.get("stock_count", 0),
-                    "category": category or "",
-                    "description": "",
-                    "imageUrl": item.get("image_url"),
-                }
-            )
-
-        return filtered[:limit]
-    except Exception as e:
-        logger.warning(f"Fallback merchant search failed: {e}")
-        return []
-
-
 async def call_search_agent(
     query: str,
     category: str | None,
@@ -233,9 +175,30 @@ async def call_search_agent(
             response.raise_for_status()
             raw_result = response.json()
             parsed = _parse_search_agent_response(raw_result)
+            raw_items = parsed.get("results")
+            if not isinstance(raw_items, list):
+                raw_items = parsed.get("candidates")
+            items: list[dict[str, Any]] = []
+            if isinstance(raw_items, list):
+                for item in raw_items:
+                    if not isinstance(item, dict):
+                        continue
+                    product_id = item.get("product_id") or item.get("id")
+                    product_name = item.get("product_name") or item.get("name")
+                    if not product_id or not product_name:
+                        continue
+                    items.append(
+                        {
+                            "product_id": product_id,
+                            "product_name": product_name,
+                            "distance": item.get("distance"),
+                            "score": item.get("score"),
+                            "similarity": item.get("similarity"),
+                        }
+                    )
             return {
-                "query": parsed.get("query", query),
-                "results": parsed.get("results", []),
+                "query": parsed.get("query") or parsed.get("user_query") or query,
+                "results": items,
             }
     except httpx.TimeoutException:
         return {"results": [], "error": "Search agent timeout"}
@@ -278,29 +241,10 @@ async def search_products(
     agent_result = await call_search_agent(query=query, category=category, limit=limit)
     if agent_result.get("error"):
         logger.warning(f"Search agent error: {agent_result.get('error')}")
-        fallback_results = await _fallback_search_from_merchant(query, category, limit)
-        if fallback_results:
-            logger.info(f"Returning {len(fallback_results)} fallback products for query '{query}'")
-            return {
-                "products": fallback_results,
-                "query": query,
-                "category": category,
-                "totalResults": len(fallback_results),
-                "user": DEFAULT_USER,
-                "theme": "dark",
-                "locale": "en-US",
-                "_meta": {
-                    "openai/outputTemplate": "ui://widget/merchant-app.html",
-                    "openai/toolInvocation/invoking": "Searching products...",
-                    "openai/toolInvocation/invoked": f"Found {len(fallback_results)} products (fallback mode)",
-                    "openai/widgetAccessible": True,
-                },
-            }
-
         return _error_search_response(
             query=query,
             category=category,
-            message=f"No products found for '{query}'.",
+            message=f"Search agent unavailable for '{query}'.",
         )
 
     agent_items = agent_result.get("results", [])

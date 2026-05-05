@@ -67,13 +67,11 @@ functions:
 # =============================================================================
 llms:
   fast_llm:
-    _type: nim
+    _type: openai
+    api_key: ${NVIDIA_API_KEY}
     base_url: ${NIM_LLM_BASE_URL:-https://integrate.api.nvidia.com/v1}
     model_name: ${NIM_LLM_MODEL_NAME:-nvidia/llama-3.1-nemotron-nano-8b-v1}
     temperature: 0.3
-    max_tokens: 512
-    chat_template_kwargs:
-      enable_thinking: false
 
 # =============================================================================
 # EVALUATION LLMs - Judge model for eval evaluators, not the main workflow

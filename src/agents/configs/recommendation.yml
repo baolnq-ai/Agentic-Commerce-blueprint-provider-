@@ -41,21 +41,17 @@ general:
 
 llms:
   nim_llm:
-    _type: nim
+    _type: openai
+    api_key: ${NVIDIA_API_KEY}
     base_url: ${NIM_LLM_BASE_URL:-https://integrate.api.nvidia.com/v1}
     model_name: ${NIM_LLM_MODEL_NAME:-nvidia/llama-3.1-nemotron-nano-8b-v1}
     temperature: 0.1
-    max_tokens: 512
-    chat_template_kwargs:
-      enable_thinking: false
   nim_llm_nli:
-    _type: nim
+    _type: openai
+    api_key: ${NVIDIA_API_KEY}
     base_url: ${NIM_LLM_BASE_URL:-https://integrate.api.nvidia.com/v1}
     model_name: ${NIM_LLM_MODEL_NAME:-nvidia/llama-3.1-nemotron-nano-8b-v1}
     temperature: 0.0
-    max_tokens: 640
-    chat_template_kwargs:
-      enable_thinking: false
 
   # -- Evaluation LLMs (judge model, not the main workflow) --------------------
   # Uses a larger model than the agent for unbiased evaluation scoring
