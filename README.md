@@ -230,17 +230,41 @@ Hub integration metadata is defined in `provider.metadata.json`, including:
 ### Simulator
 ![Agentic Commerce Simulator](docs/images/hero.png)
 
+*Home view of the simulator with client, merchant, and agent activity panels.*
+
+### Checkout Flow
+![Checkout Flow](docs/images/checkout-flow.jpg)
+
+*Product selection with checkout modal, live merchant communication, and decision updates from agents.*
+
+### Agent Activity
+![Agent Activity](docs/images/agents.jpg)
+
+*Focused view of autonomous agent decisions and reasoning output during checkout.*
+
 ### Metrics Dashboard
 ![Retail Metrics Dashboard](docs/images/metrics.png)
+
+*Commerce performance and product-health metrics in the platform dashboard.*
+
+### Phoenix Tracing
+![Phoenix Tracing Dashboard](docs/images/phoenix.png)
+
+*LLM and agent tracing projects for observability and debugging workflows.*
+
+### MinIO Console
+![MinIO Console Login](docs/images/minio.png)
+
+*Infrastructure storage console used by Milvus dependencies in this deployment.*
 
 ## Screenshot Checklist
 If you want this README to look like top GitHub repos, add screenshots/GIFs for these sections:
 
 1. [x] Hero screenshot (full UI home page)
-2. [ ] End-to-end flow (browse -> add to cart -> checkout)
-3. [ ] Agent interaction panel/log (promotion/recommendation/search in action)
-4. [ ] Phoenix tracing dashboard
-5. [ ] MinIO console (optional, for infrastructure visibility)
+2. [x] End-to-end flow (browse -> add to cart -> checkout)
+3. [x] Agent interaction panel/log (promotion/recommendation/search in action)
+4. [x] Phoenix tracing dashboard
+5. [x] MinIO console (optional, for infrastructure visibility)
 6. [ ] Terminal startup success (`bash runall.sh` final ready output)
 
 Recommended image specs:
@@ -251,13 +275,13 @@ Recommended image specs:
 Recommended placement in repo:
 - `docs/images/hero.png`
 - `docs/images/metrics.png`
-- `docs/images/checkout-flow.png`
-- `docs/images/agents.png`
+- `docs/images/checkout-flow.jpg`
+- `docs/images/agents.jpg`
 - `docs/images/phoenix.png`
 - `docs/images/minio.png`
 - `docs/images/startup.png`
 
-Hero and metrics screenshots are already embedded above. The remaining screenshots can be added when captured.
+All currently available screenshots are embedded above.
 
 ## Repository Layout
 ```text
