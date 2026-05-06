@@ -244,7 +244,7 @@ export function MerchantIframeContainer({
 
           updateAgentTelemetry(
             toolOutput as Record<string, unknown> | null,
-            "retriever_only",
+            "llm",
             toolError ? "Search request failed" : "Search request completed"
           );
 
@@ -263,7 +263,7 @@ export function MerchantIframeContainer({
         // Complete the original event with error, include fallback info in the message
         completeEvent(eventId, "error", `${errorMessage} → Fallback: ${FALLBACK_WIDGET_URL}`, 500);
         completeAgentCall(searchEventId, "error", undefined, errorMessage);
-        updateAgentTelemetry(null, "retriever_only", "Search agent unavailable");
+        updateAgentTelemetry(null, "llm", "Search agent unavailable");
 
         setIframeSrc(FALLBACK_WIDGET_URL);
         setMcpStatus("error");
@@ -419,7 +419,7 @@ export function MerchantIframeContainer({
 
           updateAgentTelemetry(
             toolOutput as Record<string, unknown> | null,
-            "retriever_only",
+            "llm",
             toolError ? "Search refresh failed" : "Search refresh completed"
           );
         } else if (toolError) {
@@ -429,7 +429,7 @@ export function MerchantIframeContainer({
         const errorMessage = error instanceof Error ? error.message : "Failed to search products";
         completeEvent(acpEventId, "error", errorMessage, 500);
         completeAgentCall(searchEventId, "error", undefined, errorMessage);
-        updateAgentTelemetry(null, "retriever_only", "Search refresh failed");
+        updateAgentTelemetry(null, "llm", "Search refresh failed");
       } finally {
         const elapsed = Date.now() - searchLoadingToken;
         const remaining = MIN_SEARCH_DELAY_MS - elapsed;
@@ -466,46 +466,52 @@ export function MerchantIframeContainer({
 
   return (
     <div className={`merchant-iframe-container${isSearchLoading ? " is-search-loading" : ""}`}>
-      {/* MCP Status indicator */}
-      {mcpStatus === "loading" && (
-        <div className="mcp-status">
-          <span className="mcp-dot loading" />
-          <span>POST /api/mcp tools/call search-products...</span>
+      <div className="status-navbar">
+        <div className="status-line" title={
+          mcpStatus === "loading"
+            ? "POST /api/mcp tools/call search-products..."
+            : mcpStatus === "success" && discoveredWidgetUri
+              ? `Discovered: ${discoveredWidgetUri}`
+              : mcpStatus === "error"
+                ? "MCP tool call failed"
+                : "Waiting for request..."
+        }>
+          <span
+            className={`status-dot ${
+              mcpStatus === "loading" ? "loading" : mcpStatus === "error" ? "error" : "success"
+            }`}
+          />
+          <span className="status-text">
+            {mcpStatus === "loading"
+              ? "POST /api/mcp tools/call search-products..."
+              : mcpStatus === "success" && discoveredWidgetUri
+                ? `Discovered: ${discoveredWidgetUri}`
+                : mcpStatus === "error"
+                  ? "MCP tool call failed"
+                  : "Waiting for request..."}
+          </span>
         </div>
-      )}
-      {mcpStatus === "success" && discoveredWidgetUri && (
-        <div className="mcp-status success">
-          <span className="mcp-dot success" />
-          <span>Discovered: {discoveredWidgetUri}</span>
-        </div>
-      )}
-      {mcpStatus === "error" && (
-        <div className="mcp-status error">
-          <span className="mcp-dot error" />
-          <span>MCP tool call failed - using fallback</span>
-        </div>
-      )}
 
-      {(agentMode || agentActivity) && (
-        <div className="agent-status">
-          <div className={`agent-mode-chip ${agentMode === "llm" ? "llm" : "retriever"}`}>
+        <div className="status-line chips">
+          <span className={`agent-mode-chip ${agentMode === "llm" ? "llm" : "retriever"}`}>
             <span className="chip-label">agent_mode</span>
             <span className="chip-value">{agentMode ?? "unknown"}</span>
-          </div>
-          <div className="agent-model-chip" title={agentModel}>
+          </span>
+          <span className="agent-model-chip" title={agentModel}>
             <span className="chip-label">model</span>
             <span className="chip-value">{agentModel}</span>
-          </div>
-          <div className="agent-runtime-chip" title={nimMode}>
+          </span>
+          <span className="agent-runtime-chip" title={nimMode}>
             <span className="chip-label">runtime</span>
             <span className="chip-value">{nimMode}</span>
-          </div>
-          <div className="agent-activity-chip" title={agentActivity}>
-            <span className="chip-label">activity</span>
-            <span className="chip-value">{agentActivity}</span>
-          </div>
+          </span>
         </div>
-      )}
+
+        <div className="status-line activity" title={agentActivity}>
+          <span className="chip-label">activity</span>
+          <span className="status-text">{agentActivity}</span>
+        </div>
+      </div>
 
       {/* Skeleton loader overlay - only render when not loaded */}
       {(!isIframeLoaded || isSearchLoading) && (
@@ -575,65 +581,55 @@ export function MerchantIframeContainer({
           background: #1a1a1a;
         }
 
-        /* MCP Status indicator */
-        .mcp-status {
-          position: absolute;
-          top: 8px;
-          left: 8px;
-          right: 8px;
+        .status-navbar {
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          padding: 8px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+          background: rgba(8, 10, 12, 0.75);
+          backdrop-filter: blur(6px);
+          z-index: 5;
+        }
+
+        .status-line {
           display: flex;
           align-items: center;
           gap: 8px;
-          padding: 8px 12px;
+          min-width: 0;
+        }
+
+        .status-line.chips {
+          gap: 6px;
+          flex-wrap: wrap;
+        }
+
+        .status-line.activity {
+          padding: 4px 8px;
           border-radius: 8px;
-          background: rgba(0, 0, 0, 0.6);
-          backdrop-filter: blur(4px);
-          font-size: 11px;
-          color: rgba(255, 255, 255, 0.7);
-          z-index: 15;
-          animation: fadeIn 0.3s ease;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          background: rgba(20, 24, 28, 0.65);
         }
 
-        .mcp-status.success {
-          background: rgba(118, 185, 0, 0.15);
-          color: #76b900;
-          animation: fadeOut 2s ease forwards;
-          animation-delay: 1s;
-        }
-
-        .mcp-status.error {
-          background: rgba(239, 68, 68, 0.15);
-          color: #ef4444;
-        }
-
-        .mcp-dot {
+        .status-dot {
           width: 6px;
           height: 6px;
           border-radius: 50%;
           background: rgba(255, 255, 255, 0.5);
+          flex-shrink: 0;
         }
 
-        .mcp-dot.loading {
+        .status-dot.loading {
           animation: pulse 1s ease-in-out infinite;
         }
 
-        .mcp-dot.success {
+        .status-dot.success {
           background: #76b900;
         }
 
-        .mcp-dot.error {
+        .status-dot.error {
           background: #ef4444;
-        }
-
-        .agent-status {
-          position: absolute;
-          top: 44px;
-          left: 8px;
-          right: 8px;
-          display: flex;
-          gap: 8px;
-          z-index: 14;
-          pointer-events: none;
         }
 
         .agent-mode-chip,
@@ -644,14 +640,13 @@ export function MerchantIframeContainer({
           align-items: center;
           gap: 6px;
           border-radius: 999px;
-          padding: 6px 10px;
-          font-size: 11px;
+          padding: 4px 8px;
+          font-size: 10px;
           line-height: 1;
-          backdrop-filter: blur(4px);
-          background: rgba(12, 16, 20, 0.78);
+          background: rgba(20, 24, 28, 0.85);
           border: 1px solid rgba(255, 255, 255, 0.12);
           color: rgba(230, 237, 243, 0.88);
-          max-width: 100%;
+          max-width: calc(100% - 4px);
         }
 
         .agent-mode-chip.llm {
@@ -664,17 +659,49 @@ export function MerchantIframeContainer({
           background: rgba(59, 130, 246, 0.16);
         }
 
-        .agent-activity-chip {
-          flex: 1;
-          min-width: 0;
-        }
-
         .agent-model-chip {
-          max-width: 220px;
+          max-width: min(240px, 100%);
         }
 
         .agent-runtime-chip {
           max-width: 120px;
+        }
+
+        .status-text {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-size: 10px;
+          color: rgba(226, 232, 240, 0.88);
+        }
+
+        @media (max-width: 540px) {
+          .status-navbar {
+            gap: 5px;
+            padding: 7px;
+          }
+
+          .status-line {
+            font-size: 10px;
+          }
+
+          .agent-mode-chip,
+          .agent-model-chip,
+          .agent-runtime-chip,
+          .agent-activity-chip {
+            padding: 4px 7px;
+            font-size: 9px;
+          }
+
+          .agent-model-chip,
+          .agent-runtime-chip {
+            max-width: 100%;
+          }
+
+          .status-text {
+            font-size: 9px;
+          }
         }
 
         .chip-label {
@@ -689,27 +716,6 @@ export function MerchantIframeContainer({
           overflow: hidden;
           text-overflow: ellipsis;
           font-weight: 500;
-        }
-
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(-4px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        @keyframes fadeOut {
-          from {
-            opacity: 1;
-          }
-          to {
-            opacity: 0;
-            visibility: hidden;
-          }
         }
 
         @keyframes pulse {
@@ -741,7 +747,7 @@ export function MerchantIframeContainer({
           display: grid;
           grid-template-rows: auto 1fr;
           padding: 18px;
-          padding-top: 48px; /* Space for MCP status */
+          padding-top: 18px;
           gap: 14px;
           pointer-events: none;
           opacity: 1;

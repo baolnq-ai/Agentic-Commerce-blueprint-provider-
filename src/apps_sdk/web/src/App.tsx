@@ -256,7 +256,7 @@ export function App() {
     const mode =
       typeof toolOutput.agent_mode === "string" && toolOutput.agent_mode
         ? toolOutput.agent_mode
-        : "retriever_only";
+        : "llm";
     const model =
       typeof toolOutput.agent_model === "string" && toolOutput.agent_model
         ? toolOutput.agent_model
@@ -266,7 +266,7 @@ export function App() {
     const activity =
       typeof toolOutput.agent_activity === "string" && toolOutput.agent_activity
         ? toolOutput.agent_activity
-        : "search products";
+        : "llm search completed";
 
     setSearchTelemetry({
       mode,
@@ -559,31 +559,12 @@ export function App() {
 
   const activeTelemetry =
     currentPage === "browse" ? searchTelemetry : recommendationTelemetry ?? searchTelemetry;
-
-  const renderTelemetry = () => {
-    if (!activeTelemetry) return null;
-    return (
-      <div className="mx-5 mb-2 mt-3 rounded-lg border border-default bg-surface-elevated/75 px-3 py-2 text-[11px] text-text-secondary">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-semibold text-text">runtime</span>
-          <span className="rounded-full border border-default px-2 py-0.5">page: {currentPage}</span>
-          <span className="rounded-full border border-default px-2 py-0.5">
-            mode: {activeTelemetry.mode}
-          </span>
-          <span className="rounded-full border border-default px-2 py-0.5">
-            model: {activeTelemetry.model}
-          </span>
-          <span className="rounded-full border border-default px-2 py-0.5">
-            source: {activeTelemetry.source}
-          </span>
-          <span className="rounded-full border border-default px-2 py-0.5">
-            runtime: {activeTelemetry.runtime}
-          </span>
-        </div>
-        <div className="mt-1 truncate">activity: {activeTelemetry.activity}</div>
-      </div>
-    );
-  };
+  const navbarTelemetry = activeTelemetry
+    ? {
+        ...activeTelemetry,
+        page: currentPage,
+      }
+    : null;
 
   // Navigate to product detail page
   const handleProductClick = useCallback(
@@ -731,7 +712,12 @@ export function App() {
   if (currentPage === "product_detail" && selectedProduct) {
     return (
       <div className="min-h-screen bg-surface transition-colors">
-        {renderTelemetry()}
+        <LoyaltyHeader
+          user={user}
+          cartItemCount={cartState.itemCount}
+          onCartClick={handleCartClick}
+          telemetry={navbarTelemetry}
+        />
         <ProductDetailPage
           product={selectedProduct}
           recommendations={productRecommendations}
@@ -756,7 +742,12 @@ export function App() {
 
     return (
       <div className="min-h-screen bg-surface transition-colors">
-        {renderTelemetry()}
+        <LoyaltyHeader
+          user={user}
+          cartItemCount={cartState.itemCount}
+          onCartClick={handleCartClick}
+          telemetry={navbarTelemetry}
+        />
         <CheckoutPage
           cartItems={cartItems}
           cartState={cartState}
@@ -792,9 +783,8 @@ export function App() {
         user={user}
         cartItemCount={cartState.itemCount}
         onCartClick={handleCartClick}
+        telemetry={navbarTelemetry}
       />
-
-      {renderTelemetry()}
 
       {/* Main Content - Only show recommendations */}
       <div className="px-5 pb-6">

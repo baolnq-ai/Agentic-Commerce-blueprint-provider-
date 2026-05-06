@@ -31,7 +31,7 @@ export function SearchPromptBar({ value, onChange, onSubmit }: SearchPromptBarPr
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex w-full items-center gap-2"
+      className="flex w-full items-center gap-2 max-[420px]:flex-col max-[420px]:items-stretch"
       aria-label="Search products"
     >
       <div className="nv-input nv-text-input-root flex-1">
@@ -46,7 +46,7 @@ export function SearchPromptBar({ value, onChange, onSubmit }: SearchPromptBarPr
       </div>
       <button
         type="submit"
-        className="nv-button nv-button--primary nv-button--brand text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+        className="nv-button nv-button--primary nv-button--brand text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50 max-[420px]:w-full"
         disabled={isDisabled}
       >
         Search

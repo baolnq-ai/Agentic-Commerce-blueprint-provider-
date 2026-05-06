@@ -42,6 +42,9 @@ MERCHANT_API_URL = settings.merchant_api_url
 SEARCH_MIN_SIMILARITY = settings.search_min_similarity
 SEARCH_DISTANCE_CUTOFF = settings.search_distance_cutoff
 NIM_EMBED_MODEL = os.environ.get("NIM_EMBED_MODEL_NAME", "nvidia/nv-embedqa-e5-v5")
+NIM_LLM_MODEL = os.environ.get("NIM_LLM_MODEL_NAME", "nvidia/llama-3.1-nemotron-nano-8b-v1")
+NIM_LLM_BASE_URL = os.environ.get("NIM_LLM_BASE_URL", "https://integrate.api.nvidia.com/v1")
+NVIDIA_API_KEY = os.environ.get("NVIDIA_API_KEY", "")
 NIM_RUN_MODE = os.environ.get("NIM_RUN_MODE", "api")
 
 DEFAULT_USER = {
@@ -68,8 +71,8 @@ def _error_search_response(
         "user": DEFAULT_USER,
         "theme": "dark",
         "locale": "en-US",
-        "agent_mode": "retriever_only",
-        "agent_model": NIM_EMBED_MODEL,
+        "agent_mode": "llm",
+        "agent_model": NIM_LLM_MODEL,
         "nim_mode": NIM_RUN_MODE,
         "agent_activity": message,
         "_meta": {
@@ -125,6 +128,169 @@ def _parse_search_agent_response(raw_result: Any) -> dict[str, Any]:
             parsed = cast(dict[str, Any], loaded)
 
     return parsed
+
+
+def _extract_json_object(text: str) -> dict[str, Any] | None:
+    """Best-effort parser for a JSON object embedded in model output."""
+    stripped = text.strip()
+    if not stripped:
+        return None
+
+    try:
+        parsed = json.loads(stripped)
+        if isinstance(parsed, dict):
+            return cast(dict[str, Any], parsed)
+    except json.JSONDecodeError:
+        pass
+
+    start = stripped.find("{")
+    end = stripped.rfind("}")
+    if start >= 0 and end > start:
+        candidate = stripped[start : end + 1]
+        try:
+            parsed = json.loads(candidate)
+            if isinstance(parsed, dict):
+                return cast(dict[str, Any], parsed)
+        except json.JSONDecodeError:
+            return None
+    return None
+
+
+def _reorder_products_by_ids(
+    products: list[dict[str, Any]],
+    ordered_ids: list[str],
+) -> list[dict[str, Any]]:
+    by_id = {
+        str(product.get("id")): product
+        for product in products
+        if isinstance(product.get("id"), str)
+    }
+    ranked: list[dict[str, Any]] = []
+    used: set[str] = set()
+
+    for product_id in ordered_ids:
+        if product_id in used:
+            continue
+        product = by_id.get(product_id)
+        if product is None:
+            continue
+        ranked.append(product)
+        used.add(product_id)
+
+    for product in products:
+        product_id = product.get("id")
+        if not isinstance(product_id, str) or product_id in used:
+            continue
+        ranked.append(product)
+        used.add(product_id)
+
+    return ranked
+
+
+async def _rank_products_with_llm(
+    query: str,
+    products: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], str]:
+    """Rank retrieved products with an LLM so every search uses model reasoning."""
+    if not products:
+        return products, "llm ranked 0 products"
+
+    candidates: list[dict[str, Any]] = []
+    for product in products[:8]:
+        product_id = product.get("id")
+        product_name = product.get("name")
+        if not isinstance(product_id, str) or not isinstance(product_name, str):
+            continue
+        candidates.append(
+            {
+                "id": product_id,
+                "name": product_name,
+                "category": product.get("category"),
+                "price": product.get("basePrice"),
+            }
+        )
+
+    if not candidates:
+        return products, f"llm ranked {len(products)} products"
+
+    prompt = {
+        "query": query,
+        "candidates": candidates,
+        "task": "Return candidate IDs ordered by semantic relevance to the query.",
+        "output": {
+            "ordered_ids": ["candidate_id_1", "candidate_id_2"],
+            "reason": "short reason",
+        },
+    }
+
+    headers = {"Content-Type": "application/json"}
+    if NVIDIA_API_KEY:
+        headers["Authorization"] = f"Bearer {NVIDIA_API_KEY}"
+
+    payload = {
+        "model": NIM_LLM_MODEL,
+        "temperature": 0,
+        "max_tokens": 220,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are an e-commerce search ranker. "
+                    "Return valid JSON only with key ordered_ids as an array of candidate IDs. "
+                    "Do not wrap JSON in markdown fences."
+                ),
+            },
+            {
+                "role": "user",
+                "content": json.dumps(prompt, ensure_ascii=False),
+            },
+        ],
+    }
+
+    last_error: Exception | None = None
+    for attempt in range(2):
+        try:
+            async with httpx.AsyncClient(timeout=45.0) as client:
+                response = await client.post(
+                    f"{NIM_LLM_BASE_URL}/chat/completions",
+                    headers=headers,
+                    json=payload,
+                )
+                response.raise_for_status()
+                data = response.json()
+
+            choices = data.get("choices")
+            if not isinstance(choices, list) or not choices:
+                raise ValueError("LLM ranker returned no choices")
+
+            first = choices[0]
+            message = first.get("message") if isinstance(first, dict) else None
+            content = message.get("content") if isinstance(message, dict) else None
+            if not isinstance(content, str):
+                raise ValueError("LLM ranker returned invalid content")
+
+            parsed = _extract_json_object(content)
+            if not parsed:
+                raise ValueError("Unable to parse ranking JSON from LLM")
+
+            ordered_ids_raw = parsed.get("ordered_ids", [])
+            ordered_ids = [
+                item.strip()
+                for item in ordered_ids_raw
+                if isinstance(item, str) and item.strip()
+            ]
+            ranked = _reorder_products_by_ids(products, ordered_ids)
+            return ranked, f"llm reranked {len(ranked)} products"
+        except (httpx.TimeoutException, httpx.NetworkError, ValueError) as exc:
+            last_error = exc
+            if attempt == 0:
+                logger.warning("LLM ranking retry for query '%s' due to %r", query, exc)
+                continue
+            raise
+
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("LLM ranking failed without explicit error")
 
 
 async def _fetch_product_from_merchant(product_id: str) -> dict[str, Any] | None:
@@ -318,8 +484,17 @@ async def search_products(
             message=f"No products found for '{query}'.",
         )
 
+    try:
+        results, activity = await _rank_products_with_llm(query=query, products=results)
+    except Exception as exc:
+        logger.warning("LLM ranking failed for query '%s': %r", query, exc)
+        return _error_search_response(
+            query=query,
+            category=category,
+            message=f"LLM ranking failed for '{query}'.",
+        )
+
     logger.info(f"Returning {len(results)} products for query '{query}'")
-    activity = f"retriever matched {len(results)} products"
     return {
         "products": results,
         "query": query,
@@ -328,8 +503,8 @@ async def search_products(
         "user": DEFAULT_USER,
         "theme": "dark",
         "locale": "en-US",
-        "agent_mode": "retriever_only",
-        "agent_model": NIM_EMBED_MODEL,
+        "agent_mode": "llm",
+        "agent_model": NIM_LLM_MODEL,
         "nim_mode": NIM_RUN_MODE,
         "agent_activity": activity,
         "_meta": {
