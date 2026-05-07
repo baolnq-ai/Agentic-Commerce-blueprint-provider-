@@ -32,6 +32,8 @@ llms:
     base_url: ${NIM_LLM_BASE_URL}
     model_name: ${NIM_LLM_MODEL_NAME}
     temperature: 0.3
+    max_retries: 2
+    request_timeout: 420
 
 # =============================================================================
 # EVALUATION LLMs - Judge model for eval evaluators, not the main workflow
@@ -212,4 +214,3 @@ eval:
         - Correctness: Is the message in the correct language and does it match the specified tone?
         - Relevance: Is the message appropriate for the shipping status and brand persona?
         Rate each dimension from 0.0 to 1.0.
-

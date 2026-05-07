@@ -130,7 +130,7 @@ async def process_acp_checkout(
     items = [{"id": item["id"], "quantity": item["quantity"]} for item in cart_items]
 
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=480.0) as client:
             # Step 1: Create checkout session on merchant API
             logger.info(f"Creating checkout session for cart {cart_id}")
             # Generate stable event ID for matching pending/complete events

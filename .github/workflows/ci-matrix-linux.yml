@@ -1,0 +1,60 @@
+name: ci-matrix-linux
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  docker-build-matrix:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: merchant
+            dockerfile: src/merchant/Dockerfile
+          - service: ui
+            dockerfile: src/ui/Dockerfile
+          - service: apps-sdk
+            dockerfile: src/apps_sdk/Dockerfile
+          - service: agents
+            dockerfile: src/agents/Dockerfile
+          - service: psp
+            dockerfile: src/payment/Dockerfile
+          - service: merchant
+            dockerfile: src/merchant/Dockerfile
+            platform: linux/arm64
+          - service: ui
+            dockerfile: src/ui/Dockerfile
+            platform: linux/arm64
+          - service: apps-sdk
+            dockerfile: src/apps_sdk/Dockerfile
+            platform: linux/arm64
+          - service: agents
+            dockerfile: src/agents/Dockerfile
+            platform: linux/arm64
+          - service: psp
+            dockerfile: src/payment/Dockerfile
+            platform: linux/arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build ${{ matrix.service }} (${{ matrix.platform || 'linux/amd64' }})
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: ${{ matrix.platform || 'linux/amd64' }}
+          push: false
+          load: false
+          provenance: false

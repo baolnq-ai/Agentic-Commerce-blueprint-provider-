@@ -250,7 +250,7 @@ async def _rank_products_with_llm(
     last_error: Exception | None = None
     for attempt in range(2):
         try:
-            async with httpx.AsyncClient(timeout=45.0) as client:
+            async with httpx.AsyncClient(timeout=240.0) as client:
                 response = await client.post(
                     f"{NIM_LLM_BASE_URL}/chat/completions",
                     headers=headers,

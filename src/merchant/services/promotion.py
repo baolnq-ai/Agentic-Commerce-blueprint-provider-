@@ -39,7 +39,7 @@ import logging
 import time
 from datetime import date
 from enum import StrEnum
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 
 import httpx
 from sqlmodel import Session, select
@@ -49,6 +49,33 @@ from src.merchant.db.models import CompetitorPrice, Product
 from src.merchant.services.agent_outcomes import record_agent_outcome
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_json_object(text: str) -> dict[str, Any] | None:
+    """Best-effort parser for a JSON object embedded in model output."""
+    stripped = text.strip()
+    if not stripped:
+        return None
+
+    try:
+        parsed = json.loads(stripped)
+        if isinstance(parsed, dict):
+            return cast(dict[str, Any], parsed)
+    except json.JSONDecodeError:
+        pass
+
+    start = stripped.find("{")
+    end = stripped.rfind("}")
+    if start >= 0 and end > start:
+        candidate = stripped[start : end + 1]
+        try:
+            parsed = json.loads(candidate)
+            if isinstance(parsed, dict):
+                return cast(dict[str, Any], parsed)
+        except json.JSONDecodeError:
+            return None
+
+    return None
 
 
 # =============================================================================
@@ -255,10 +282,10 @@ class PromotionAgentClient:
         """
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                # NAT /generate endpoint expects {"query": "<JSON string>"}
+                # NAT /generate endpoint expects an input_message or messages payload.
                 response = await client.post(
                     f"{self.base_url}/generate",
-                    json={"query": json.dumps(context)},
+                    json={"input_message": json.dumps(context)},
                     headers={"Content-Type": "application/json"},
                 )
 
@@ -275,8 +302,13 @@ class PromotionAgentClient:
 
                 # NAT returns response in {"value": "<JSON string>"} format
                 if "value" in result:
-                    try:
-                        decision = json.loads(result["value"])
+                    decision = None
+                    if isinstance(result["value"], dict):
+                        decision = result["value"]
+                    elif isinstance(result["value"], str):
+                        decision = _extract_json_object(result["value"])
+
+                    if isinstance(decision, dict):
                         return PromotionDecisionOutput(
                             product_id=decision.get(
                                 "product_id", context["product_id"]
@@ -287,11 +319,12 @@ class PromotionAgentClient:
                             reason_codes=decision.get("reason_codes", []),
                             reasoning=decision.get("reasoning", ""),
                         )
-                    except json.JSONDecodeError as e:
-                        logger.warning(
-                            "Failed to parse promotion agent response as JSON: %s", e
-                        )
-                        return None
+
+                    logger.warning(
+                        "Failed to parse promotion agent response as JSON: %s",
+                        result.get("value"),
+                    )
+                    return None
 
                 logger.warning(
                     "Unexpected response format from promotion agent: %s", result

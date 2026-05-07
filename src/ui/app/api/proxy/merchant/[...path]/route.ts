@@ -14,6 +14,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { request as httpRequest } from "node:http";
+import { request as httpsRequest } from "node:https";
 
 // Force Node.js runtime (not Edge) for full API compatibility
 export const runtime = "nodejs";
@@ -21,6 +23,7 @@ export const dynamic = "force-dynamic";
 
 const MERCHANT_API_URL = process.env.MERCHANT_API_URL || "http://localhost:8000";
 const MERCHANT_API_KEY = process.env.MERCHANT_API_KEY;
+const MERCHANT_PROXY_TIMEOUT_MS = Number(process.env.MERCHANT_PROXY_TIMEOUT_MS || "900000");
 
 // Fail-fast: log warning on module load if API key is missing
 // (actual error returned on first request)
@@ -90,6 +93,57 @@ function buildUpstreamHeaders(request: NextRequest): Headers {
   return headers;
 }
 
+type UpstreamResponse = {
+  body: Buffer;
+  headers: Record<string, string | string[] | undefined>;
+  statusCode: number;
+  statusMessage: string | undefined;
+};
+
+async function sendUpstreamRequest(
+  upstreamUrl: URL,
+  method: string,
+  headers: Headers,
+  body: ArrayBuffer | null
+): Promise<UpstreamResponse> {
+  return new Promise((resolve, reject) => {
+    const requestImpl = upstreamUrl.protocol === "https:" ? httpsRequest : httpRequest;
+    const req = requestImpl(
+      upstreamUrl,
+      {
+        method,
+        headers: Object.fromEntries(headers.entries()),
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk) => {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        });
+        res.on("end", () => {
+          resolve({
+            body: Buffer.concat(chunks),
+            headers: res.headers,
+            statusCode: res.statusCode ?? 502,
+            statusMessage: res.statusMessage,
+          });
+        });
+      }
+    );
+
+    req.setTimeout(MERCHANT_PROXY_TIMEOUT_MS, () => {
+      req.destroy(new Error(`Merchant upstream timed out after ${MERCHANT_PROXY_TIMEOUT_MS}ms`));
+    });
+
+    req.on("error", reject);
+
+    if (body && body.byteLength > 0) {
+      req.write(Buffer.from(body));
+    }
+
+    req.end();
+  });
+}
+
 /**
  * Generic proxy handler for GET, POST, PUT, PATCH, DELETE
  */
@@ -125,29 +179,28 @@ async function proxyRequest(
   }
 
   try {
-    const response = await fetch(upstreamUrl.toString(), {
-      method: request.method,
-      headers: upstreamHeaders,
-      body: body,
-    });
-
-    // Forward response with status and headers
-    const responseBody = await response.arrayBuffer();
+    const response = await sendUpstreamRequest(upstreamUrl, request.method, upstreamHeaders, body);
     const responseHeaders = new Headers();
 
     // Forward safe response headers
-    for (const [key, value] of response.headers.entries()) {
+    for (const [key, value] of Object.entries(response.headers)) {
       // Skip hop-by-hop headers
       if (!["transfer-encoding", "connection", "keep-alive"].includes(key.toLowerCase())) {
-        responseHeaders.set(key, value);
+        if (Array.isArray(value)) {
+          responseHeaders.set(key, value.join(", "));
+        } else if (typeof value === "string") {
+          responseHeaders.set(key, value);
+        }
       }
     }
 
-    return new NextResponse(responseBody, {
-      status: response.status,
-      statusText: response.statusText,
+    const responseInit = {
+      status: response.statusCode,
       headers: responseHeaders,
-    });
+      ...(response.statusMessage ? { statusText: response.statusMessage } : {}),
+    };
+
+    return new NextResponse(new Uint8Array(response.body), responseInit);
   } catch (error) {
     console.error("[MerchantProxy] Fetch error:", error);
     return NextResponse.json({ error: "Upstream request failed" }, { status: 502 });

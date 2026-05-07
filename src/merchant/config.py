@@ -67,11 +67,11 @@ class Settings(BaseSettings):
 
     # Promotion Agent Configuration
     promotion_agent_url: str = "http://localhost:8002"
-    promotion_agent_timeout: float = 10.0  # seconds (NFR-LAT target)
+    promotion_agent_timeout: float = 420.0  # seconds
 
     # Post-Purchase Agent Configuration
     post_purchase_agent_url: str = "http://localhost:8003"
-    post_purchase_agent_timeout: float = 15.0  # seconds
+    post_purchase_agent_timeout: float = 420.0  # seconds
 
 
 @lru_cache
