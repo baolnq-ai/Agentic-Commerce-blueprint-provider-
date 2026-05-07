@@ -49,27 +49,76 @@ logger = logging.getLogger(__name__)
 
 def _extract_json_object(text: str) -> dict[str, Any] | None:
     """Best-effort parser for a JSON object embedded in model output."""
+
+    def _strip_markdown_fence(value: str) -> str:
+        candidate = value.strip()
+        if candidate.startswith("```") and candidate.endswith("```"):
+            lines = candidate.splitlines()
+            if len(lines) >= 3:
+                candidate = "\n".join(lines[1:-1]).strip()
+        return candidate
+
+    def _escape_multiline_json_strings(value: str) -> str:
+        # Some model responses include literal newlines inside quoted strings,
+        # which is invalid JSON. Normalize those newlines to escaped sequences.
+        out: list[str] = []
+        in_string = False
+        escaping = False
+
+        for ch in value:
+            if ch == '"' and not escaping:
+                in_string = not in_string
+                out.append(ch)
+                escaping = False
+                continue
+
+            if ch == "\\" and not escaping:
+                out.append(ch)
+                escaping = True
+                continue
+
+            if in_string and ch == "\n":
+                out.append("\\n")
+                escaping = False
+                continue
+
+            if in_string and ch == "\r":
+                out.append("\\r")
+                escaping = False
+                continue
+
+            out.append(ch)
+            escaping = False
+
+        return "".join(out)
+
+    def _parse_candidate(value: str) -> dict[str, Any] | None:
+        normalized = _strip_markdown_fence(value)
+        for candidate in (normalized, _escape_multiline_json_strings(normalized)):
+            try:
+                parsed = json.loads(candidate)
+                if isinstance(parsed, dict):
+                    return cast(dict[str, Any], parsed)
+            except json.JSONDecodeError:
+                continue
+        return None
+
     stripped = text.strip()
     if not stripped:
         return None
 
-    try:
-        parsed = json.loads(stripped)
-        if isinstance(parsed, dict):
-            return cast(dict[str, Any], parsed)
-    except json.JSONDecodeError:
-        pass
+    parsed = _parse_candidate(stripped)
+    if parsed is not None:
+        return parsed
 
     start = stripped.find("{")
     end = stripped.rfind("}")
     if start >= 0 and end > start:
         candidate = stripped[start : end + 1]
-        try:
-            parsed = json.loads(candidate)
-            if isinstance(parsed, dict):
-                return cast(dict[str, Any], parsed)
-        except json.JSONDecodeError:
-            return None
+        parsed = _parse_candidate(candidate)
+        if parsed is not None:
+            return parsed
+        return None
 
     return None
 

@@ -30,8 +30,8 @@ llms:
     base_url: ${NIM_LLM_BASE_URL}
     model_name: ${NIM_LLM_MODEL_NAME}
     temperature: 0.1
-    max_retries: 2
-    request_timeout: 420
+    max_retries: 1
+    request_timeout: 10
 
 # =============================================================================
 # EVALUATION LLMs - Judge model for eval evaluators, not the main workflow

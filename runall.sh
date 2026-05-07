@@ -121,8 +121,8 @@ HOST_BASE_URL="$(format_base_url "$HTTP_HOST_PORT")"
 export HOST_BASE_URL
 export PHOENIX_ENDPOINT="http://localhost:${PHOENIX_UI_PORT}/v1/traces"
 export MILVUS_URI="http://localhost:${MILVUS_PORT}"
-ensure_min_float PROMOTION_AGENT_TIMEOUT 420.0 "Promotion agent"
-ensure_min_float POST_PURCHASE_AGENT_TIMEOUT 420.0 "Post-purchase agent"
+ensure_min_float PROMOTION_AGENT_TIMEOUT 35.0 "Promotion agent"
+ensure_min_float POST_PURCHASE_AGENT_TIMEOUT 70.0 "Post-purchase agent"
 
 NIM_RUN_MODE="${NIM_RUN_MODE:-api}"
 if [[ "$NIM_RUN_MODE" != "api" && "$NIM_RUN_MODE" != "local_nim" ]]; then
