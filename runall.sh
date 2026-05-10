@@ -159,11 +159,6 @@ COMPOSE_CMD=(docker compose "${COMPOSE_FILES[@]}")
 NIM_COMPOSE=(-f "$ROOT_DIR/docker-compose-nim.yml")
 NIM_CMD=(docker compose "${NIM_COMPOSE[@]}")
 
-if ! docker network inspect acp-infra-network >/dev/null 2>&1; then
-  docker network create acp-infra-network >/dev/null
-  ok "Created network acp-infra-network"
-fi
-
 if [[ "$NIM_RUN_MODE" == "local_nim" ]]; then
   info "Starting local NVIDIA NIM runtime"
   "${NIM_CMD[@]}" up -d

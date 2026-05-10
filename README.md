@@ -107,6 +107,14 @@ NVIDIA_API_KEY=nvapi-...
 bash runall.sh
 ```
 
+`runall.sh` is the recommended entrypoint. The Docker Compose files also manage
+the shared `acp-infra-network` themselves, so a direct compose launch works on a
+fresh machine without creating Docker networks by hand:
+
+```bash
+docker compose -f docker-compose.infra.yml -f docker-compose.yml up -d --build
+```
+
 5. Open and verify:
 - UI: `http://localhost:${HTTP_HOST_PORT:-80}`
 - Merchant health: `http://localhost:${HTTP_HOST_PORT:-80}/api/health`
