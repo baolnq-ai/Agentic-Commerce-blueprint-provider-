@@ -300,7 +300,6 @@ networks:
   acp-network:
     driver: bridge
   acp-infra-network:
-    name: acp-infra-network
     driver: bridge
 
 # =============================================================================

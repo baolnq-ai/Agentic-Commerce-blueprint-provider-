@@ -111,11 +111,10 @@ services:
 # NETWORKS
 # =============================================================================
 networks:
-  # Shared bridge network for infra and app services. Compose manages it so
-  # direct compose launches work on a fresh machine without a pre-created
-  # external Docker network.
+  # Shared bridge network for infra and app services. Compose keeps the
+  # concrete Docker network project-scoped to avoid collisions with stale
+  # acp-infra-network networks from older installs.
   acp-infra-network:
-    name: acp-infra-network
     driver: bridge
 
 # =============================================================================
