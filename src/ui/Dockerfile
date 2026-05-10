@@ -17,7 +17,7 @@
 # Multi-stage build for optimized production image
 
 # Stage 1: Install dependencies
-FROM node:20-slim AS deps
+FROM node:22-slim AS deps
 
 WORKDIR /app
 
@@ -32,7 +32,7 @@ COPY src/ui/kui-foundations-react-external ./kui-foundations-react-external
 RUN pnpm install --frozen-lockfile
 
 # Stage 2: Build the application
-FROM node:20-slim AS builder
+FROM node:22-slim AS builder
 
 WORKDIR /app
 
@@ -56,7 +56,7 @@ ENV NEXT_PUBLIC_UCP_PLATFORM_PROFILE_URL=${NEXT_PUBLIC_UCP_PLATFORM_PROFILE_URL}
 RUN pnpm build
 
 # Stage 3: Production runner
-FROM node:20-slim AS runner
+FROM node:22-slim AS runner
 
 WORKDIR /app
 

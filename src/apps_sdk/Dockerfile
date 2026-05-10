@@ -17,7 +17,7 @@
 # Multi-stage build: Node.js for widget, Python for server
 
 # Stage 1: Build the React widget
-FROM node:20-slim AS widget-builder
+FROM node:22-slim AS widget-builder
 
 WORKDIR /widget
 
