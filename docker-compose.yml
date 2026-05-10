@@ -273,6 +273,8 @@ services:
   milvus-seeder:
     image: nat-agents:latest
     container_name: milvus-seeder
+    profiles:
+      - seed
     command: python scripts/seed_milvus.py
     environment:
       - NVIDIA_API_KEY=${NVIDIA_API_KEY}

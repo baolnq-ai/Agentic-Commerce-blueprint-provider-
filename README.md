@@ -107,12 +107,19 @@ NVIDIA_API_KEY=nvapi-...
 bash runall.sh
 ```
 
-`runall.sh` is the recommended entrypoint. The Docker Compose files also manage
-the shared `acp-infra-network` themselves, so a direct compose launch works on a
-fresh machine without creating Docker networks by hand:
+`runall.sh` is the recommended entrypoint. The Docker Compose files use
+project-scoped networks, so a direct compose launch works on a fresh machine and
+does not collide with stale networks from older installs:
 
 ```bash
 docker compose -f docker-compose.infra.yml -f docker-compose.yml up -d --build
+```
+
+The Milvus catalog seeder is a one-shot job kept behind the `seed` profile so
+`docker compose up --wait` can finish cleanly. Run it after the stack is healthy:
+
+```bash
+docker compose -f docker-compose.infra.yml -f docker-compose.yml --profile seed run --rm milvus-seeder
 ```
 
 5. Open and verify:

@@ -206,6 +206,10 @@ for i in $(seq 1 60); do
   sleep 3
 done
 
+info "Seeding Milvus product catalog"
+"${COMPOSE_CMD[@]}" --profile seed run --rm milvus-seeder
+ok "Milvus seed job completed"
+
 info "Waiting for agent services"
 for i in $(seq 1 300); do
   if "${COMPOSE_CMD[@]}" exec -T search-agent curl -sf "http://localhost:8005/health" >/dev/null 2>&1 \
