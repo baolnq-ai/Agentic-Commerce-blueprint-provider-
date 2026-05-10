@@ -22,7 +22,7 @@ FROM node:22-slim AS deps
 WORKDIR /app
 
 # Enable corepack for pnpm
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 
 # Copy package files and local Kaizen UI dependency
 COPY src/ui/package.json src/ui/pnpm-lock.yaml ./
@@ -37,7 +37,7 @@ FROM node:22-slim AS builder
 WORKDIR /app
 
 # Enable corepack for pnpm
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 
 # Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules

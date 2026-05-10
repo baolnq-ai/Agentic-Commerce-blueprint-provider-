@@ -22,7 +22,7 @@ FROM node:22-slim AS widget-builder
 WORKDIR /widget
 
 # Enable corepack for pnpm
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 
 # Copy package files
 COPY src/apps_sdk/web/package.json src/apps_sdk/web/pnpm-lock.yaml ./
