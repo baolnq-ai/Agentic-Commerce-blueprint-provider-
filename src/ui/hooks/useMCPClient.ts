@@ -118,7 +118,7 @@ export function useMCPClient() {
               arguments: args,
             },
           }),
-          signal: AbortSignal.timeout(65000), // 65s timeout for search agent (can take 20-30s)
+          signal: AbortSignal.timeout(180000), // 180s timeout for slower first-run search agent calls
         });
 
         if (!response.ok) {
@@ -249,7 +249,7 @@ export function useMCPClient() {
               arguments: args,
             },
           }),
-          signal: AbortSignal.timeout(65000), // 65s timeout for ARAG agent (takes ~25s)
+          signal: AbortSignal.timeout(180000), // 180s timeout for slower first-run agent calls
         });
 
         if (!response.ok) {
