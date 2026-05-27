@@ -21,7 +21,6 @@ services:
   # etcd - Metadata storage for Milvus
   milvus-etcd:
     image: quay.io/coreos/etcd:v3.5.5
-    container_name: milvus-etcd
     environment:
       - ETCD_AUTO_COMPACTION_MODE=revision
       - ETCD_AUTO_COMPACTION_RETENTION=1000
@@ -41,7 +40,6 @@ services:
   # MinIO - Object storage for Milvus
   milvus-minio:
     image: minio/minio:RELEASE.2023-03-20T20-16-18Z
-    container_name: milvus-minio
     environment:
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
@@ -61,7 +59,6 @@ services:
   # Milvus Standalone - Vector database
   milvus-standalone:
     image: milvusdb/milvus:v2.4.0
-    container_name: milvus-standalone
     command: ["milvus", "run", "standalone"]
     ports:
       - "${MILVUS_PORT:-19530}:19530"  # Milvus gRPC port
@@ -91,7 +88,6 @@ services:
   # Phoenix - LLM Observability and Tracing
   phoenix:
     image: arizephoenix/phoenix:latest
-    container_name: phoenix
     ports:
       - "${PHOENIX_UI_PORT:-6006}:6006"   # Phoenix UI and OTLP HTTP collector
       - "${PHOENIX_GRPC_PORT:-4317}:4317"   # OTLP gRPC collector

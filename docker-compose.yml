@@ -17,7 +17,6 @@ services:
   # =============================================================================
   nginx:
     image: nginx:alpine
-    container_name: nginx
     ports:
       - "${HTTP_HOST_PORT:-80}:80"
     volumes:
@@ -44,7 +43,6 @@ services:
     build:
       context: .
       dockerfile: src/merchant/Dockerfile
-    container_name: merchant
     expose:
       - "8000"
     environment:
@@ -74,7 +72,6 @@ services:
     build:
       context: .
       dockerfile: src/payment/Dockerfile
-    container_name: psp
     expose:
       - "8001"
     environment:
@@ -91,7 +88,6 @@ services:
     build:
       context: .
       dockerfile: src/apps_sdk/Dockerfile
-    container_name: apps-sdk
     expose:
       - "2091"
     environment:
@@ -115,7 +111,6 @@ services:
     build:
       context: .
       dockerfile: src/ui/Dockerfile
-    container_name: ui
     expose:
       - "3000"
     environment:
@@ -144,7 +139,6 @@ services:
       context: .
       dockerfile: src/agents/Dockerfile
     image: nat-agents:latest
-    container_name: nat-promotion-agent
     command: nat serve --config_file configs/promotion.yml --host 0.0.0.0 --port 8002
     expose:
       - "8002"
@@ -171,7 +165,6 @@ services:
   # Post-Purchase Agent (Port 8003) - Uses shared image
   post-purchase-agent:
     image: nat-agents:latest
-    container_name: nat-post-purchase-agent
     command: nat serve --config_file configs/post-purchase.yml --host 0.0.0.0 --port 8003
     expose:
       - "8003"
@@ -201,7 +194,6 @@ services:
   # Recommendation Agent (Port 8004) - Uses shared image, requires Milvus
   recommendation-agent:
     image: nat-agents:latest
-    container_name: nat-recommendation-agent
     command: nat serve --config_file configs/recommendation.yml --host 0.0.0.0 --port 8004
     expose:
       - "8004"
@@ -234,7 +226,6 @@ services:
   # Search Agent (Port 8005) - Uses shared image, requires Milvus for RAG
   search-agent:
     image: nat-agents:latest
-    container_name: nat-search-agent
     command: nat serve --config_file configs/search.yml --host 0.0.0.0 --port 8005
     expose:
       - "8005"
@@ -272,7 +263,6 @@ services:
   # Runs once on startup, skips if already seeded
   milvus-seeder:
     image: nat-agents:latest
-    container_name: milvus-seeder
     profiles:
       - seed
     command: python scripts/seed_milvus.py
